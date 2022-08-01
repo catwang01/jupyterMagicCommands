@@ -1,3 +1,4 @@
+import sys
 from io import StringIO
 from IPython.core.magic import register_cell_magic
 import os
@@ -7,6 +8,7 @@ import time
 from pathlib import Path
 import subprocess
 import logging
+from .utils import executeCmd
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -18,6 +20,7 @@ formatter = logging.Formatter("%(asctime)s - %(filename)s - %(name)s - %(levelna
 streamhandler.setFormatter(formatter)
 
 logger.addHandler(streamhandler)
+
 
 def analyzeCode(code):
     usingLines = []
@@ -65,7 +68,7 @@ def runCsharp(cell, args):
         tmpFile.write_text(code)
         ret = subprocess.run(f"csc {tmpFile.name} -out:tmp.exe -nologo", shell=True, cwd=tmpDir)
         if ret.returncode == 0:
-             ret = subprocess.run(f"mono tmp.exe", shell=True, cwd=tmpDir)
+             executeCmd("mono tmp.exe")
                 
 def transformLogLevel(s):
     level = {
