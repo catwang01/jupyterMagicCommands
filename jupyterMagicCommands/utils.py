@@ -1,4 +1,6 @@
+import os
 from subprocess import Popen, PIPE
+from pathlib import Path
 import shlex
 
 def _run_command(cmd):
@@ -11,8 +13,13 @@ def _run_command(cmd):
         exit_code = p.poll()
     return exit_code
 
-def executeCmd(cmd, backend=None):
-    if backend is None or backend == "ipython":
-        get_ipython().system(cmd)
-    else:
-        _run_command(cmd)
+def executeCmd(cmd, cwd='.', backend=None):
+    currentDir = Path.cwd()
+    os.chdir(cwd)
+    try:
+        if backend is None or backend == "ipython":
+            get_ipython().system(cmd)
+        else:
+            _run_command(cmd)
+    finally:
+        os.chdir(currentDir)
