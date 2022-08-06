@@ -1,4 +1,5 @@
 import sys
+import re
 from io import StringIO
 from IPython.core.magic import register_cell_magic
 import os
@@ -42,7 +43,8 @@ def analyzeCode(code):
     return {'using': '\n'.join(usingLines), 'body': "\n".join(bodyLines)}
 
 def completeCode(code, args):
-    if "public static void Main" in code:
+    # TODO: update here 
+    if "Main" in code:
         return code
     else:
         analyzedCode = analyzeCode(code)
@@ -66,9 +68,10 @@ def runCsharp(cell, args):
         tmpDir = Path(tmpDir)
         tmpFile = tmpDir / "{}.cs".format(int(time.time()))
         tmpFile.write_text(code)
-        ret = subprocess.run(f"csc {tmpFile.name} -out:tmp.exe -nologo", shell=True, cwd=tmpDir)
-        if ret.returncode == 0:
-             executeCmd("mono tmp.exe")
+        logger.debug(code)
+        executeCmd(f"csc {tmpFile.name} -out:tmp.exe -nologo", cwd=tmpDir )
+        if os.path.exists(tmpDir / "tmp.exe"):
+            executeCmd(f"mono tmp.exe", cwd=tmpDir)
                 
 def transformLogLevel(s):
     level = {
