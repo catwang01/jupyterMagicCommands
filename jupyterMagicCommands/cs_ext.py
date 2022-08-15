@@ -64,14 +64,18 @@ def completeCode(code, args):
 def runCsharp(cell, args):
     code = completeCode(cell, args)
     logger.debug(code)
+    verbose = args.debug
     with TemporaryDirectory() as tmpDir:
-        tmpDir = Path(tmpDir)
-        tmpFile = tmpDir / "{}.cs".format(int(time.time()))
-        tmpFile.write_text(code)
+        executeCmd(f"dotnet new console", cwd=tmpDir, verbose=verbose)
+        tmpFile = Path(tmpDir) / 'Program.cs'
         logger.debug(code)
-        executeCmd(f"csc {tmpFile.name} -out:tmp.exe -nologo", cwd=tmpDir )
-        if os.path.exists(tmpDir / "tmp.exe"):
-            executeCmd(f"mono tmp.exe", cwd=tmpDir)
+        tmpFile.write_text(code)
+        for packageInfo in args.packageInfos:
+            if "version" in packageInfo:
+                executeCmd(f"dotnet add package {packageInfo['name']} --verion {packageInfo['version']}", cwd=tmpDir, verbose=verbose)
+            else:
+                executeCmd(f"dotnet add package {packageInfo['name']}", cwd=tmpDir, verbose=verbose)
+        executeCmd("dotnet run", cwd=tmpDir)
                 
 def transformLogLevel(s):
     level = {
@@ -82,11 +86,26 @@ def transformLogLevel(s):
         print(f"Unsupported level: {level}")
         sys.exit(1)
     return level
+
+def processPackageInfo(s):
+    ret = {}
+    infos = s.split(":")
+    if len(infos) == 1:
+        ret['name'] = infos[0]
+    elif len(infos) == 2:
+        ret['name'] = infos[0]
+        ret['version'] = infos[1]
+    else:
+        raise Exception(f"Not a valid package info: {s}. Package info should be <package-name> or <package-name>:<version>")
+    return ret
+
                 
 @register_cell_magic
 def cs(line, cell):
     parser = argparse.ArgumentParser()
     parser.add_argument('--logLevel', default=logging.INFO, type=transformLogLevel)
+    parser.add_argument('--addPackage', dest="packageInfos", type=processPackageInfo , action="append" , default=[])
+    parser.add_argument('--debug', action="store_true", default=False)
     if line.strip() != '':
         args = parser.parse_args(line.strip(' ').split(' '))
     else:
