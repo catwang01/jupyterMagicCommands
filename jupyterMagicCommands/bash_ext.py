@@ -24,14 +24,15 @@ def preprocessCommand(command: str, args: argparse.Namespace) -> str:
 @register_cell_magic
 def bash(line, cell):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cwd", type=str, default=".")
+    parser.add_argument("-d", "--d", "--cwd", dest="cwd", type=str, default=".")
+    parser.add_argument("-v", "--verbose", action='store_true', default=False)
     line = line.strip('\n').strip(' ').lstrip('%%bash')
     if line:
         args = parser.parse_args(line.split(' '))
     else:
         args = parser.parse_args([])
     command = preprocessCommand(cell, args)
-    executeCmd(command, args)
+    executeCmd(command, args.verbose)
 
 def load_ipython_extension(ipython):
     ipython.register_magic_function(bash, 'cell')
