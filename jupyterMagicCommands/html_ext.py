@@ -19,7 +19,7 @@ def html(line: str, cell: str):
     filename = cellhash + '.html'
     with open(filename, 'w') as f:
         f.write(cell)
-    return  IFrame(filename, width=args.width, height=args.height)
+    return IFrame(filename, width=args.width, height=args.height)
 
 def load_ipython_extension(ipython):
     ipython.register_magic_function(html, 'cell')

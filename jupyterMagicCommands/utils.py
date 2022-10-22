@@ -1,4 +1,5 @@
 import os
+from IPython import get_ipython
 import subprocess
 from subprocess import Popen, PIPE
 from pathlib import Path
@@ -19,7 +20,7 @@ def executeCmd(cmd, cwd='.', verbose=True, backend=None):
     os.chdir(cwd)
     try:
         if verbose == False:
-            ret = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
+            subprocess.run(cmd, shell=True, stdout=subprocess.PIPE)
         elif backend is None or backend == "ipython":
             get_ipython().system(cmd)
         else:
