@@ -1,7 +1,6 @@
 import sys
 import re
 from io import StringIO
-from IPython.core.magic import register_cell_magic
 import os
 from tempfile import TemporaryDirectory
 import argparse
@@ -99,8 +98,6 @@ def processPackageInfo(s):
         raise Exception(f"Not a valid package info: {s}. Package info should be <package-name> or <package-name>:<version>")
     return ret
 
-                
-@register_cell_magic
 def cs(line, cell):
     parser = argparse.ArgumentParser()
     parser.add_argument('--logLevel', default=logging.INFO, type=transformLogLevel)

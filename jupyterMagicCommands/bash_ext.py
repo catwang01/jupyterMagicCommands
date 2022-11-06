@@ -7,7 +7,6 @@ import tempfile
 import argparse
 from IPython.display import display
 from IPython import get_ipython
-from IPython.core.magic import register_cell_magic
 
 template = """
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.5.0/css/xterm.css" />

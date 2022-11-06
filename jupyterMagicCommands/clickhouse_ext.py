@@ -4,7 +4,6 @@ import requests
 import pandas as pd
 from io import StringIO
 from IPython.display import Pretty
-from IPython.core.magic import register_cell_magic
 from pathlib import Path
 
 class FormatHandlerFactory:
@@ -72,7 +71,6 @@ class PrettyCompactFormatHandler(VerticalFormatHandler):
     format = "PrettyCompact"
     
 
-@register_cell_magic
 def ck(line, cell):
     parser = getParser()
     inArgs = line.strip().split(' ')

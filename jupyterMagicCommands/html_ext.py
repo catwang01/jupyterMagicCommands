@@ -1,11 +1,9 @@
 from io import StringIO
-from IPython.core.magic import register_cell_magic
 from IPython.display import IFrame
 import argparse
 import os
 import hashlib
 
-@register_cell_magic
 def html(line: str, cell: str):
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('-w', '--width', type=int, default=300)

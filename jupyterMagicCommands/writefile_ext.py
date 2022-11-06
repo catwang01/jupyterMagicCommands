@@ -2,7 +2,6 @@ from io import StringIO
 from IPython.core.magic import register_cell_magic
 import os
 
-@register_cell_magic
 def writefile(line, cell):
     sio = StringIO(cell)
     text  = sio.read()
