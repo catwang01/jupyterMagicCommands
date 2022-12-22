@@ -47,6 +47,13 @@ def sendToTerminal(termName, displayHandler, message, prevMessage=None):
 """
     displayHandler.update({'text/html': template}, raw=True)
 
+def _get_command_to_run(filename, image):
+    if image is not None:
+        cmd =  f"docker exec {filename} {image}:/ && docker exec {image} bash '{filename}'"
+    else:
+        cmd = f"bash '{fp.name}'"
+    return cmd
+
 def plainExecuteCommand(command, verbose=False, **kwargs):
     if verbose:
         print(command)
@@ -54,7 +61,7 @@ def plainExecuteCommand(command, verbose=False, **kwargs):
     with tempfile.NamedTemporaryFile(encoding=encoding, mode='w') as fp:
         fp.write(command)
         fp.seek(0)
-        cmd = f"bash '{fp.name}'"
+        cmd = _get_command_to_run(fp.name, kwargs.get('image'))
         get_ipython().system(cmd)
 
 def xtermExecuteCommand(command, verbose=False, **kwargs):
@@ -64,7 +71,8 @@ def xtermExecuteCommand(command, verbose=False, **kwargs):
     with tempfile.NamedTemporaryFile(encoding=encoding, mode='w') as fp:
         fp.write(command)
         fp.seek(0)
-        child = pexpect.spawn(f"bash {fp.name}")
+        cmd = _get_command_to_run(fp.name, kwargs.get('image'))
+        child = pexpect.spawn(cmd)
         initialOptions = {
             'rows': kwargs.get('height', 10)
         }
@@ -92,10 +100,23 @@ def preprocessCommand(command: str, args: argparse.Namespace) -> str:
     command = "cd {}\n".format(args.cwd) + command
     return command
 
-@register_cell_magic
+def prepare(args: argparse.Namespace):
+    if os.path.exists(args.cwd):
+        if args.initialize:
+            os.removedirs(args.cwd)
+    else:
+        if args.create:
+            os.makedirs(args.cwd)
+        else:
+            raise Exception(f"Accessing non existing working directory: {args.cwd}! You can specify --create flag to create an empty working directory")
+    os.chdir(args.cwd)
+
 def bash(line, cell):
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--d", "--cwd", dest="cwd", type=str, default=".")
+    parser.add_argument("-d", "--d", "--cwd", dest="cwd", type=str, default=".", help="Working directory")
+    parser.add_argument("--create", action='store_true', default=False, help="Create the working directory if not existing. Do nothing if the directory exists")
+    parser.add_argument("--initialize", action='store_true', default=False, help="Initialize the working directory. If it exists, remove it and create an empty one. if not, create an empty one.")
+    parser.add_argument('--image', help="docker image name or id, if this is specified, the command would run in the specified container ")
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
     parser.add_argument("-b", "--backend", type=str, default="plain")
     parser.add_argument("--height", type=int, default=10)
@@ -105,7 +126,9 @@ def bash(line, cell):
     else:
         args = parser.parse_args([])
     command = preprocessCommand(cell, args)
-    executeCmd(command, verbose=args.verbose, backend=args.backend, height=args.height)
+    executeCmd(command, verbose=args.verbose, backend=args.backend, height=args.height, image=args.image)
 
+
+# load point
 def load_ipython_extension(ipython):
     ipython.register_magic_function(bash, 'cell')
