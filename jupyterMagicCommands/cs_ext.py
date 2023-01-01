@@ -61,7 +61,9 @@ def completeCode(code, args):
     return code
 
 def runCsharp(cell, args):
-    code = completeCode(cell, args)
+    # since C#9, there is no need to have a Main
+    # code = completeCode(cell, args)
+    code = cell
     logger.debug(code)
     verbose = args.debug
     with TemporaryDirectory() as tmpDir:
