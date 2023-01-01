@@ -7,6 +7,19 @@ import tempfile
 import argparse
 from IPython.display import display
 from IPython import get_ipython
+import logging
+from logging import ERROR, INFO, DEBUG
+
+logger = logging.getLogger(__name__)
+logger.setLevel(ERROR)
+
+streamhandler = logging.StreamHandler()
+streamhandler.setLevel(DEBUG)
+
+formatter = logging.Formatter("%(asctime)s - %(filename)s - %(name)s - %(levelname)s - %(message)s")
+streamhandler.setFormatter(formatter)
+logger.addHandler(streamhandler)
+
 
 template = """
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.5.0/css/xterm.css" />
@@ -49,12 +62,13 @@ def sendToTerminal(termName, displayHandler, message, prevMessage=None):
 
 def _get_command_to_run(filename, image):
     if image is not None:
-        cmd =  f"docker exec {filename} {image}:/ && docker exec {image} bash '{filename}'"
+        cmd =  f"docker cp {filename} {image}:{filename} && docker exec {image} bash '{filename}'"
     else:
-        cmd = f"bash '{fp.name}'"
+        cmd = f"bash '{filename}'"
     return cmd
 
 def plainExecuteCommand(command, verbose=False, **kwargs):
+    logger = kwargs.get('logger', logging.getLogger(__name__))
     if verbose:
         print(command)
     encoding = "utf-8"
@@ -62,9 +76,11 @@ def plainExecuteCommand(command, verbose=False, **kwargs):
         fp.write(command)
         fp.seek(0)
         cmd = _get_command_to_run(fp.name, kwargs.get('image'))
+        logger.debug(cmd)
         get_ipython().system(cmd)
 
 def xtermExecuteCommand(command, verbose=False, **kwargs):
+    logger = kwargs.get('logger', logging.getLogger(__name__))
     if verbose:
         print(command)
     encoding = 'utf8'
@@ -72,6 +88,7 @@ def xtermExecuteCommand(command, verbose=False, **kwargs):
         fp.write(command)
         fp.seek(0)
         cmd = _get_command_to_run(fp.name, kwargs.get('image'))
+        logger.debug(cmd)
         child = pexpect.spawn(cmd)
         initialOptions = {
             'rows': kwargs.get('height', 10)
@@ -96,22 +113,28 @@ def executeCmd(*args, backend="plain", **kwargs):
     else:
         raise NotValidBackend(f"Not a valid backend {backend}")
 
+
 def preprocessCommand(command: str, args: argparse.Namespace) -> str:
-    command = "cd {}\n".format(args.cwd) + command
+    """
+    Currently no preprocess is needed
+    """
     return command
 
 def prepare(args: argparse.Namespace):
     if os.path.exists(args.cwd):
+        logger.debug("Folder %r exists", args.cwd)
         if args.initialize:
             os.removedirs(args.cwd)
     else:
+        logger.debug("Folder %r doesn't exist", args.cwd)
         if args.create:
+            logger.debug(f"Create folder {args.cwd}")
             os.makedirs(args.cwd)
         else:
             raise Exception(f"Accessing non existing working directory: {args.cwd}! You can specify --create flag to create an empty working directory")
     os.chdir(args.cwd)
 
-def bash(line, cell):
+def _bash(line, cell):
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--d", "--cwd", dest="cwd", type=str, default=".", help="Working directory")
     parser.add_argument("--create", action='store_true', default=False, help="Create the working directory if not existing. Do nothing if the directory exists")
@@ -119,6 +142,7 @@ def bash(line, cell):
     parser.add_argument('--image', help="docker image name or id, if this is specified, the command would run in the specified container ")
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
     parser.add_argument("-b", "--backend", type=str, default="plain")
+    parser.add_argument("--logLevel", type=int, choices=[DEBUG, INFO, ERROR], default=ERROR)
     parser.add_argument("--height", type=int, default=10)
     line = line.strip('\n').strip(' ').lstrip('%%bash')
     if line:
@@ -126,8 +150,22 @@ def bash(line, cell):
     else:
         args = parser.parse_args([])
     command = preprocessCommand(cell, args)
-    executeCmd(command, verbose=args.verbose, backend=args.backend, height=args.height, image=args.image)
+    logger.setLevel(args.logLevel)
+    logger.debug("Current dir: %s", os.getcwd())
+    logger.debug(args)
+    prepare(args)
+    executeCmd(command, verbose=args.verbose, 
+                        backend=args.backend, 
+                        height=args.height, 
+                        image=args.image, 
+                        logger=logger)
 
+def bash(line, cell):
+    try:
+        olddir = os.getcwd()
+        _bash(line, cell)
+    finally:
+        os.chdir(olddir)
 
 # load point
 def load_ipython_extension(ipython):
