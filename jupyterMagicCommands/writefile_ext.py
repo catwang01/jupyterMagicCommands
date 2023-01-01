@@ -23,8 +23,18 @@ def writefile(line, cell):
         os.makedirs(dirPath)
     mode = 'w'
     if args.append:
-        mode += 'a'
-    log = f'Overwriting {filePath}' if os.path.exists(filePath) else f'Writing {filePath}'
+        mode = 'a'
+    if os.path.exists(filePath):
+        if args.append:
+            log = f"Appending {filePath}"
+        else:
+            log = f'Overwriting {filePath}'  
+    else:
+        if args.append:
+            print(f"Trying to append to a non-existing file {filePath}. Can't write such file!")
+            return
+        else:
+            log = f'Writing {filePath}'
     with open(filePath, mode) as f:
         f.write(text)
     print(log)
