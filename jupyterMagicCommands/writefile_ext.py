@@ -9,6 +9,7 @@ def writefile(line, cell):
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('filePath')
+    parser.add_argument('-i', '--container', type=str, default=None)
     parser.add_argument('-a', '--append', action='store_true', default=False)
     parser.add_argument('-f', '--force', action='store_true', default=False)
     parser.add_argument('-d', '--directory', default=None)

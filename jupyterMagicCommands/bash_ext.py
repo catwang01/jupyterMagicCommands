@@ -60,9 +60,9 @@ def sendToTerminal(termName, displayHandler, message, prevMessage=None):
 """
     displayHandler.update({'text/html': template}, raw=True)
 
-def _get_command_to_run(filename, image):
-    if image is not None:
-        cmd =  f"docker cp {filename} {image}:{filename} && docker exec {image} bash '{filename}'"
+def _get_command_to_run(filename, container):
+    if container is not None:
+        cmd =  f"docker cp {filename} {container}{filename} && docker exec {container} bash '{filename}'"
     else:
         cmd = f"bash '{filename}'"
     return cmd
@@ -75,7 +75,7 @@ def plainExecuteCommand(command, verbose=False, **kwargs):
     with tempfile.NamedTemporaryFile(encoding=encoding, mode='w') as fp:
         fp.write(command)
         fp.seek(0)
-        cmd = _get_command_to_run(fp.name, kwargs.get('image'))
+        cmd = _get_command_to_run(fp.name, kwargs.get('container'))
         logger.debug(cmd)
         get_ipython().system(cmd)
 
@@ -87,7 +87,7 @@ def xtermExecuteCommand(command, verbose=False, **kwargs):
     with tempfile.NamedTemporaryFile(encoding=encoding, mode='w') as fp:
         fp.write(command)
         fp.seek(0)
-        cmd = _get_command_to_run(fp.name, kwargs.get('image'))
+        cmd = _get_command_to_run(fp.name, kwargs.get('container'))
         logger.debug(cmd)
         child = pexpect.spawn(cmd)
         initialOptions = {
@@ -139,7 +139,7 @@ def _bash(line, cell):
     parser.add_argument("-d", "--d", "--cwd", dest="cwd", type=str, default=".", help="Working directory")
     parser.add_argument("--create", action='store_true', default=False, help="Create the working directory if not existing. Do nothing if the directory exists")
     parser.add_argument("--initialize", action='store_true', default=False, help="Initialize the working directory. If it exists, remove it and create an empty one. if not, create an empty one.")
-    parser.add_argument('--image', help="docker image name or id, if this is specified, the command would run in the specified container ")
+    parser.add_argument('--container', help="docker container name or id, if this is specified, the command would run in the specified container ")
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
     parser.add_argument("-b", "--backend", type=str, default="plain")
     parser.add_argument("--logLevel", type=int, choices=[DEBUG, INFO, ERROR], default=ERROR)
@@ -157,7 +157,7 @@ def _bash(line, cell):
     executeCmd(command, verbose=args.verbose, 
                         backend=args.backend, 
                         height=args.height, 
-                        image=args.image, 
+                        container=args.container, 
                         logger=logger)
 
 def bash(line, cell):
