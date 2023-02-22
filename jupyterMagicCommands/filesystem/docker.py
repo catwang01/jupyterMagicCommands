@@ -28,7 +28,7 @@ class DockerFileSystem(IFileSystem):
 
     def exists(self, path: str) -> bool:
         template = f"""
-if [ -x '{path}' ]; then 
+if [ -e '{path}' ]; then 
     echo "Exists"
 else
     echo "Doesn't exist"
@@ -53,7 +53,7 @@ mkdir -p '{path}'
         f = tempfile.NamedTemporaryFile(mode, encoding=encoding)
         return self.FileInContainerWrapper(self.container, f, filename)
     
-    class FileInContainerWrapper(IO):
+    class FileInContainerWrapper:
 
         def __init__(self, container: Container, file: IO, path: str):
             self.container = container
@@ -93,6 +93,7 @@ mkdir -p '{path}'
             """
             Copy the temporary file, and close it
             """
+            self.file.seek(0)
             copy_to_container(self.container, self.file.name, self.path)
             self.file.close()
 

@@ -24,8 +24,11 @@ class TestDockerFileSystem:
         dockerfilesystem.makedirs('/a/b/c')
         assert dockerfilesystem.exists('/a/b/c') == True
 
-    def test_write_file_to_container(self, dockerfilesystem):
+    def test_write_file_to_container(self, container, dockerfilesystem):
         path = '/app/a/b/c/test.txt'
         with dockerfilesystem.open(path, 'w', encoding='utf8') as f:
             f.write('hello')
             f.write('hello')
+        
+        assert dockerfilesystem.exists(path)
+        assert container.exec_run(f'cat {path}').output.decode() == "hellohello"

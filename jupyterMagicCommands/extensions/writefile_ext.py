@@ -1,10 +1,25 @@
 import os
+import docker
 from argparse import Namespace
 from io import StringIO
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.filesystem.docker import DockerFileSystem
+import logging
+from logging import ERROR, DEBUG, INFO
 
-def _writefile(text: str, args: Namespace, fs: IFileSystem):
+from jupyterMagicCommands.filesystem.filesystem import FileSystem
+
+logger = logging.getLogger(__name__)
+logger.setLevel(ERROR)
+
+streamhandler = logging.StreamHandler()
+streamhandler.setLevel(DEBUG)
+
+formatter = logging.Formatter("%(asctime)s - %(filename)s - %(name)s - %(levelname)s - %(message)s")
+streamhandler.setFormatter(formatter)
+logger.addHandler(streamhandler)
+
+def _writefile(text: str, args: Namespace, fs: IFileSystem) -> None:
     if args.directory is not None:
         filePath = os.path.expanduser(os.path.join(args.directory, args.filePath))
     else:
@@ -27,7 +42,7 @@ def _writefile(text: str, args: Namespace, fs: IFileSystem):
         else:
             log = f'Writing {filePath}'
     
-    with fs.open(filePath, mode) as f:
+    with fs.open(filePath, mode, encoding='utf8') as f:
         f.write(text)
     print(log)
 
@@ -38,13 +53,23 @@ def writefile(line, cell):
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('filePath')
-    parser.add_argument('-i', '--container', type=str, default=None)
+    parser.add_argument('-c', '--container', type=str, default=None)
     parser.add_argument('-a', '--append', action='store_true', default=False)
     parser.add_argument('-f', '--force', action='store_true', default=False)
     parser.add_argument('-d', '--directory', default=None)
+    parser.add_argument('-l', '--logLevel', choices=[DEBUG, INFO, ERROR], default=INFO)
     args = parser.parse_args(line.strip(' ').split(' '))
 
-    fs = DockerFileSystem()
+    logger.setLevel(args.logLevel)
+
+    fs: IFileSystem
+    if args.container is not None:
+        client = docker.from_env()
+        container = client.containers.get(args.container)
+        logger.debug("Intialize a container %s", container)
+        fs = DockerFileSystem(container)
+    else:
+        fs = FileSystem()
     _writefile(text, args, fs)
     
     return

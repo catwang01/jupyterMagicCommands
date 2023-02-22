@@ -18,7 +18,6 @@ formatter = logging.Formatter("%(asctime)s - %(filename)s - %(name)s - %(levelna
 streamhandler.setFormatter(formatter)
 logger.addHandler(streamhandler)
 
-
 template = """
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.5.0/css/xterm.css" />
     <script src="https://cdn.jsdelivr.net/npm/xterm@4.5.0/lib/xterm.js"></script>

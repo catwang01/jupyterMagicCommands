@@ -4,7 +4,7 @@ from docker.models.containers import Container
 
 def copy_to_container(container: Container, src: str, dst: str) -> None:
     with tarfile.open(src + '.tar', mode='w') as f:
-        f.add(src, arcname=os.path.basename(src))
+        f.add(src, arcname=os.path.basename(dst))
     with  open(src + '.tar', 'rb') as f:
         data = f.read()
     targetFolder = os.path.dirname(dst)
