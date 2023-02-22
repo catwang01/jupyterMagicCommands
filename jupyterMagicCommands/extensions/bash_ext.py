@@ -60,7 +60,7 @@ def sendToTerminal(termName, displayHandler, message, prevMessage=None):
 
 def _get_command_to_run(filename, container):
     if container is not None:
-        cmd =  f"docker cp {filename} {container}{filename} && docker exec {container} bash '{filename}'"
+        cmd =  f"docker cp {filename} {container}:{filename} && docker exec {container} bash '{filename}'"
     else:
         cmd = f"bash '{filename}'"
     return cmd
