@@ -1,5 +1,3 @@
-# ~/.ipython/extensions/bash_ext.py
-
 import os
 import time
 import pexpect

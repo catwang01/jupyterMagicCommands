@@ -2,8 +2,7 @@ import os
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from subprocess import Popen, PIPE
-from .utils import executeCmd
+from jupyterMagicCommands.utils.cmd import executeCmd
 
 def pwsh(line, cell):
     encoding = 'utf8'

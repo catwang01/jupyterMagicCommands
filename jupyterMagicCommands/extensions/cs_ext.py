@@ -1,14 +1,10 @@
-import sys
-import re
-from io import StringIO
-import os
-from tempfile import TemporaryDirectory
 import argparse
-import time
-from pathlib import Path
-import subprocess
 import logging
-from .utils import executeCmd
+import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from jupyterMagicCommands.utils.cmd import executeCmd
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
