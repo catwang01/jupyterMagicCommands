@@ -1,12 +1,18 @@
-import os
-import time
-import pexpect
-import tempfile
 import argparse
-from IPython.display import display
-from IPython import get_ipython
 import logging
-from logging import ERROR, INFO, DEBUG
+import os
+import tempfile
+import time
+from argparse import Namespace
+from logging import DEBUG, ERROR, INFO
+
+import pexpect
+from IPython import get_ipython
+from IPython.display import display
+
+from jupyterMagicCommands.filesystem.filesystem_factory import \
+    FileSystemFactory
+from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 
 logger = logging.getLogger(__name__)
 logger.setLevel(ERROR)
@@ -66,15 +72,23 @@ def _get_command_to_run(filename, container):
 
 def plainExecuteCommand(command, verbose=False, **kwargs):
     logger = kwargs.get('logger', logging.getLogger(__name__))
+    logger.debug('### Parameters starts ###')
+    logger.debug(f"command: '{command}'")
+    logger.debug(f"verbose: '{verbose}'")
+    logger.debug(f"kwargs: '{kwargs}'")
+    logger.debug('### Parameters ends ###')
     if verbose:
         print(command)
     encoding = "utf-8"
-    with tempfile.NamedTemporaryFile(encoding=encoding, mode='w') as fp:
-        fp.write(command)
-        fp.seek(0)
-        cmd = _get_command_to_run(fp.name, kwargs.get('container'))
-        logger.debug(cmd)
-        get_ipython().system(cmd)
+    if kwargs.get('container', None) is not None and kwargs.get('fs', None) is not None:
+        kwargs['fs'].system(command)
+    else:
+        with tempfile.NamedTemporaryFile(encoding=encoding, mode='w') as fp:
+            fp.write(command)
+            fp.seek(0)
+            cmd = f"bash '{fp.name}'"
+            logger.debug(cmd)
+            get_ipython().system(cmd)
 
 def xtermExecuteCommand(command, verbose=False, **kwargs):
     logger = kwargs.get('logger', logging.getLogger(__name__))
@@ -84,7 +98,7 @@ def xtermExecuteCommand(command, verbose=False, **kwargs):
     with tempfile.NamedTemporaryFile(encoding=encoding, mode='w') as fp:
         fp.write(command)
         fp.seek(0)
-        cmd = _get_command_to_run(fp.name, kwargs.get('container'))
+        cmd = f"bash '{fp.name}'"
         logger.debug(cmd)
         child = pexpect.spawn(cmd)
         initialOptions = {
@@ -106,6 +120,8 @@ def executeCmd(*args, backend="plain", **kwargs):
     if backend == "plain":
         plainExecuteCommand(*args, **kwargs)
     elif backend == "xterm":
+        if kwargs.get('container', None) is not None:
+            raise Exception(f"Backend {backend} doesn't suppor docker running in a container")
         xtermExecuteCommand(*args, **kwargs)
     else:
         raise NotValidBackend(f"Not a valid backend {backend}")
@@ -117,26 +133,26 @@ def preprocessCommand(command: str, args: argparse.Namespace) -> str:
     """
     return command
 
-def prepare(args: argparse.Namespace):
-    if os.path.exists(args.cwd):
+def prepare(args: argparse.Namespace, fs: IFileSystem):
+    if fs.exists(args.cwd):
         logger.debug("Folder %r exists", args.cwd)
         if args.initialize:
-            os.removedirs(args.cwd)
+            fs.removedirs(args.cwd)
     else:
         logger.debug("Folder %r doesn't exist", args.cwd)
         if args.create:
             logger.debug(f"Create folder {args.cwd}")
-            os.makedirs(args.cwd)
+            fs.makedirs(args.cwd)
         else:
             raise Exception(f"Accessing non existing working directory: {args.cwd}! You can specify --create flag to create an empty working directory")
-    os.chdir(args.cwd)
+    fs.chdir(args.cwd)
 
-def _bash(line, cell):
+def get_args(line: str) -> Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--d", "--cwd", dest="cwd", type=str, default=".", help="Working directory")
     parser.add_argument("--create", action='store_true', default=False, help="Create the working directory if not existing. Do nothing if the directory exists")
     parser.add_argument("--initialize", action='store_true', default=False, help="Initialize the working directory. If it exists, remove it and create an empty one. if not, create an empty one.")
-    parser.add_argument('--container', help="docker container name or id, if this is specified, the command would run in the specified container ")
+    parser.add_argument('-c', '--container', help="docker container name or id, if this is specified, the command would run in the specified container ")
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
     parser.add_argument("-b", "--backend", type=str, default="plain")
     parser.add_argument("--logLevel", type=int, choices=[DEBUG, INFO, ERROR], default=ERROR)
@@ -146,23 +162,30 @@ def _bash(line, cell):
         args = parser.parse_args(line.split(' '))
     else:
         args = parser.parse_args([])
-    command = preprocessCommand(cell, args)
-    logger.setLevel(args.logLevel)
-    logger.debug("Current dir: %s", os.getcwd())
+    return args
+
+def _bash(args: Namespace, fs: IFileSystem, cell: str):
+    logger.debug("Current dir: %s", fs.getcwd())
     logger.debug(args)
-    prepare(args)
+
+    command = preprocessCommand(cell, args)
+    prepare(args, fs)
     executeCmd(command, verbose=args.verbose, 
                         backend=args.backend, 
                         height=args.height, 
                         container=args.container, 
+                        fs=fs,
                         logger=logger)
 
-def bash(line, cell):
+def bash(line: str, cell: str):
+    args = get_args(line)
+    logger.setLevel(args.logLevel)
+    fs = FileSystemFactory.get_filesystem(args.container)
     try:
-        olddir = os.getcwd()
-        _bash(line, cell)
+        olddir = fs.getcwd()
+        _bash(args, fs, cell)
     finally:
-        os.chdir(olddir)
+        fs.chdir(olddir)
 
 # load point
 def load_ipython_extension(ipython):

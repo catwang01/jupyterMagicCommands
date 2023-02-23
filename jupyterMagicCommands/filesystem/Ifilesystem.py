@@ -1,6 +1,5 @@
 from typing import IO
 from abc import abstractmethod
-import os
 
 class IFileSystem:
 
@@ -15,5 +14,20 @@ class IFileSystem:
     @abstractmethod
     def open(self, filename: str, mode: str, encoding: str) -> IO:
         pass
+
+    @abstractmethod
+    def getcwd(self) -> str:
+        pass
+
+    @abstractmethod
+    def chdir(self, path: str) -> None:
+        pass
+
+    @abstractmethod
+    def removedirs(self, path: str) -> None:
+        pass
      
+    @abstractmethod
+    def system(self, path: str) -> None:
+        pass
         

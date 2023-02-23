@@ -1,4 +1,4 @@
-
+import os
 import functools
 import tempfile
 from typing import IO
@@ -8,12 +8,14 @@ from docker.models.containers import Container, ExecResult
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.utils.docker import copy_to_container
 
+class DirectoryNotExist(Exception):
+    pass
 
 class DockerFileSystem(IFileSystem):
 
-    def __init__(self, container: Container) -> None:
+    def __init__(self, container: Container, workdir: str = '/') -> None:
         self.container = container
-
+        self._workdir = workdir
 
     def copy_to_container(self, src: str, dst: str):
         copy_to_container(self.container, src, dst)
@@ -23,7 +25,7 @@ class DockerFileSystem(IFileSystem):
             fp.write(cmd)
             fp.seek(0)
             self.copy_to_container(fp.name, fp.name)
-            results = self.container.exec_run(f"bash '{fp.name}'")
+            results = self.container.exec_run(f"bash '{fp.name}'", workdir=self._workdir)
         return results
 
     def exists(self, path: str) -> bool:
@@ -52,6 +54,39 @@ mkdir -p '{path}'
     def open(self, filename: str, mode: str="w+", encoding: str='utf8') -> IO:
         f = tempfile.NamedTemporaryFile(mode, encoding=encoding)
         return self.FileInContainerWrapper(self.container, f, filename)
+
+    def getcwd(self) -> str:
+        results = self._execute_cmd('pwd')
+        output = results.output.decode().strip()
+        if results.exit_code != 0:
+            raise Exception(output)
+        return output
+
+    def chdir(self, path: str) -> None:
+        if not self.exists(path):
+            raise DirectoryNotExist(f"target directory '{path}' doesn't exist!")
+        if os.path.isabs(path):
+            self._workdir = path
+        else:
+            self._workdir = os.path.join(self._workdir, path)
+
+    def removedirs(self, path: str) -> None:
+        template = f"""
+rm -rf '{path}'
+"""
+        results = self._execute_cmd(template)
+        output: str = results.output.decode()
+        if results.exit_code != 0:
+            raise Exception(output)
+
+    def system(self, cmd: str) -> None:
+        results = self._execute_cmd(cmd)
+        output = results.output.decode()
+        # remove the latest "\n" while printing
+        if output.endswith('\n'):
+            print(output, end="")
+        else:
+            print(output)
     
     class FileInContainerWrapper:
 

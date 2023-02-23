@@ -1,13 +1,12 @@
+import logging
 import os
-import docker
 from argparse import Namespace
 from io import StringIO
-from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
-from jupyterMagicCommands.filesystem.docker import DockerFileSystem
-import logging
-from logging import ERROR, DEBUG, INFO
+from logging import DEBUG, ERROR, INFO
 
-from jupyterMagicCommands.filesystem.filesystem import FileSystem
+from jupyterMagicCommands.filesystem.filesystem_factory import \
+    FileSystemFactory
+from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 
 logger = logging.getLogger(__name__)
 logger.setLevel(ERROR)
@@ -62,14 +61,7 @@ def writefile(line, cell):
 
     logger.setLevel(args.logLevel)
 
-    fs: IFileSystem
-    if args.container is not None:
-        client = docker.from_env()
-        container = client.containers.get(args.container)
-        logger.debug("Intialize a container %s", container)
-        fs = DockerFileSystem(container)
-    else:
-        fs = FileSystem()
+    fs = FileSystemFactory.get_filesystem(args.container)
     _writefile(text, args, fs)
     
     return
