@@ -11,7 +11,7 @@ class FileSystem(IFileSystem):
         os.makedirs(path)
 
     def open(self, filename, mode, encoding) -> IO:
-        return open(filename, mode, encoding)
+        return open(filename, mode, encoding=encoding)
 
     def getcwd(self) -> str:
         return os.getcwd()
