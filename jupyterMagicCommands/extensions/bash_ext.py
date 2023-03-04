@@ -63,13 +63,6 @@ def sendToTerminal(termName, displayHandler, message, prevMessage=None):
 """
     displayHandler.update({'text/html': template}, raw=True)
 
-def _get_command_to_run(filename, container):
-    if container is not None:
-        cmd =  f"docker cp {filename} {container}:{filename} && docker exec {container} bash '{filename}'"
-    else:
-        cmd = f"bash '{filename}'"
-    return cmd
-
 def plainExecuteCommand(command, verbose=False, **kwargs):
     logger = kwargs.get('logger', logging.getLogger(__name__))
     logger.debug('### Parameters starts ###')
@@ -80,8 +73,11 @@ def plainExecuteCommand(command, verbose=False, **kwargs):
     if verbose:
         print(command)
     encoding = "utf-8"
-    if kwargs.get('container', None) is not None and kwargs.get('fs', None) is not None:
-        kwargs['fs'].system(command)
+    if kwargs.get('container', None) is not None:
+        if kwargs.get('fs', None) is not None:
+            kwargs['fs'].system(command)
+        else:
+            raise Exception("FileSystem is not initliazed for a container!")
     else:
         with tempfile.NamedTemporaryFile(encoding=encoding, mode='w') as fp:
             fp.write(command)
@@ -181,8 +177,8 @@ def bash(line: str, cell: str):
     args = get_args(line)
     logger.setLevel(args.logLevel)
     fs = FileSystemFactory.get_filesystem(args.container)
+    olddir = fs.getcwd()
     try:
-        olddir = fs.getcwd()
         _bash(args, fs, cell)
     finally:
         fs.chdir(olddir)

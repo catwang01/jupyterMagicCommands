@@ -1,7 +1,7 @@
 import os
 import functools
 import tempfile
-from typing import IO
+from typing import IO, Optional, List
 
 from docker.models.containers import Container, ExecResult
 
@@ -11,11 +11,28 @@ from jupyterMagicCommands.utils.docker import copy_to_container
 class DirectoryNotExist(Exception):
     pass
 
-class DockerFileSystem(IFileSystem):
+SHELL_DETECT_LIST = ["fish", "bash", "sh", "ash"]
 
+class DockerFileSystem(IFileSystem):
     def __init__(self, container: Container, workdir: str = '/') -> None:
         self.container = container
         self._workdir = workdir
+        self._default_shell: Optional[str] = None
+        self._default_shell_checked: bool = False
+        
+    @property
+    def default_shell(self) -> Optional[str]:
+        if self._default_shell is None and not self._default_shell_checked:
+            self._default_shell = self._detect_default_shells()
+            self._default_shell_checked = True
+        return self._default_shell
+    
+    def _detect_default_shells(self, detect_list: List[str]=SHELL_DETECT_LIST) -> Optional[str]:
+        for shell in detect_list:
+            results = self.container.exec_run(shell, workdir=self._workdir)
+            if results.exit_code == 0:
+                return shell
+        return None
 
     def copy_to_container(self, src: str, dst: str):
         copy_to_container(self.container, src, dst)
@@ -25,7 +42,7 @@ class DockerFileSystem(IFileSystem):
             fp.write(cmd)
             fp.seek(0)
             self.copy_to_container(fp.name, fp.name)
-            results = self.container.exec_run(f"bash '{fp.name}'", workdir=self._workdir)
+            results = self.container.exec_run(f"{self.default_shell} {fp.name}", workdir=self._workdir)
         return results
 
     def exists(self, path: str) -> bool:

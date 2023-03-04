@@ -24,6 +24,10 @@ def dockerfilesystem(container) -> IFileSystem:
     return fs
 
 class TestDockerFileSystem:
+
+    def test_if_default_shell_can_be_detect_correctly(self, dockerfilesystem):
+        assert dockerfilesystem.default_shell == "bash"
+
     def test_check_whether_file_exists_in_container(self, dockerfilesystem):
         dockerfilesystem.makedirs('/a/b/c')
         assert dockerfilesystem.exists('/a/b/c') == True
