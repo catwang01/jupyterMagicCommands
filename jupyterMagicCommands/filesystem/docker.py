@@ -5,6 +5,7 @@ from typing import IO, Optional, List
 
 from docker.models.containers import Container, ExecResult
 
+from jupyterMagicCommands.mixins.logmixin import LogMixin
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.utils.docker import copy_to_container
 
@@ -13,7 +14,7 @@ class DirectoryNotExist(Exception):
 
 SHELL_DETECT_LIST = ["fish", "bash", "sh", "ash"]
 
-class DockerFileSystem(IFileSystem):
+class DockerFileSystem(IFileSystem, LogMixin):
     def __init__(self, container: Container, workdir: str = '/') -> None:
         self.container = container
         self._workdir = workdir
@@ -37,12 +38,24 @@ class DockerFileSystem(IFileSystem):
     def copy_to_container(self, src: str, dst: str):
         copy_to_container(self.container, src, dst)
 
-    def _execute_cmd(self, cmd: str) -> ExecResult:
+    def _execute_cmd(self, cmd: str, 
+                            background: bool=False, 
+                            outFile: Optional[str]=None, **kwargs) -> ExecResult:
         with tempfile.NamedTemporaryFile(mode="w+") as fp:
             fp.write(cmd)
             fp.seek(0)
             self.copy_to_container(fp.name, fp.name)
-            results = self.container.exec_run(f"{self.default_shell} {fp.name}", workdir=self._workdir)
+            actual_cmd_to_run = f"{self.default_shell} {fp.name}"
+            if background:
+                if outFile is None:
+                    actual_cmd_to_run += f" &"
+                    print("WARNING: outFile is not set, the output of command will be discarded")
+                else:
+                    actual_cmd_to_run += f" 1>'{outFile}' 2>&1 &"
+            self.logger.debug("actual command to run: %s", actual_cmd_to_run)
+            results = self.container.exec_run(actual_cmd_to_run,
+                                              workdir=self._workdir,
+                                              **kwargs)
         return results
 
     def exists(self, path: str) -> bool:
@@ -96,15 +109,20 @@ rm -rf '{path}'
         if results.exit_code != 0:
             raise Exception(output)
 
-    def system(self, cmd: str) -> None:
-        results = self._execute_cmd(cmd)
-        output = results.output.decode()
-        # remove the latest "\n" while printing
-        if output.endswith('\n'):
-            print(output, end="")
+    def system(self, cmd: str, 
+                background: bool=False, 
+                outFile: Optional[str]=None) -> None:
+        if background:
+            results = self._execute_cmd(cmd, background=background, outFile=outFile, detach=True)
+            if results.exit_code and results.exit_code != 0:
+                raise Exception(results.output.decode())
         else:
-            print(output)
-    
+            results = self._execute_cmd(cmd, stream=True)
+            if results.exit_code is not None and results.exit_code != 0:
+                raise Exception(results)
+            for line in results.output:
+                print(line.decode('utf8'), end="")
+
     class FileInContainerWrapper:
 
         def __init__(self, container: Container, file: IO, path: str):

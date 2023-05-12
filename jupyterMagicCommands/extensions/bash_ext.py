@@ -1,13 +1,12 @@
 import argparse
 import logging
-import os
 import tempfile
 import time
-from argparse import Namespace
+from dataclasses import dataclass
 from logging import DEBUG, ERROR, INFO
+from typing import Optional
 
 import pexpect
-from IPython import get_ipython
 from IPython.display import display
 
 from jupyterMagicCommands.filesystem.filesystem_factory import \
@@ -44,6 +43,19 @@ template = """
 class NotValidBackend(Exception):
     pass
 
+@dataclass
+class BashArgumentNamespace:
+    cwd: str = '.'
+    create: bool = False
+    initialize: bool = False
+    container: Optional[str] = None
+    verbose: bool = False
+    backend: str = "plain"
+    logLevel: int = ERROR
+    height: int = 10
+    background: bool=False
+    outFile: Optional[str]=None
+
 def initTerminal(initialOptions):
     termName = f"term_{time.strftime('%Y_%m_%d_%H_%M_%S')}"
     display({'text/html': template % ({'termName': termName, 'rows': initialOptions['rows']}) }, raw=True)
@@ -72,19 +84,12 @@ def plainExecuteCommand(command, verbose=False, **kwargs):
     logger.debug('### Parameters ends ###')
     if verbose:
         print(command)
-    encoding = "utf-8"
-    if kwargs.get('container', None) is not None:
-        if kwargs.get('fs', None) is not None:
-            kwargs['fs'].system(command)
-        else:
-            raise Exception("FileSystem is not initliazed for a container!")
+    if kwargs.get('fs', None) is not None:
+        kwargs['fs'].system(command, 
+                            background=kwargs.get('background'), 
+                            outFile=kwargs.get('outFile'))
     else:
-        with tempfile.NamedTemporaryFile(encoding=encoding, mode='w') as fp:
-            fp.write(command)
-            fp.seek(0)
-            cmd = f"bash '{fp.name}'"
-            logger.debug(cmd)
-            get_ipython().system(cmd)
+        raise Exception("FileSystem is not initliazed for a container!")
 
 def xtermExecuteCommand(command, verbose=False, **kwargs):
     logger = kwargs.get('logger', logging.getLogger(__name__))
@@ -123,13 +128,13 @@ def executeCmd(*args, backend="plain", **kwargs):
         raise NotValidBackend(f"Not a valid backend {backend}")
 
 
-def preprocessCommand(command: str, args: argparse.Namespace) -> str:
+def preprocessCommand(command: str, args: BashArgumentNamespace) -> str:
     """
     Currently no preprocess is needed
     """
     return command
 
-def prepare(args: argparse.Namespace, fs: IFileSystem):
+def prepare(args: BashArgumentNamespace, fs: IFileSystem):
     if fs.exists(args.cwd):
         logger.debug("Folder %r exists", args.cwd)
         if args.initialize:
@@ -143,7 +148,7 @@ def prepare(args: argparse.Namespace, fs: IFileSystem):
             raise Exception(f"Accessing non existing working directory: {args.cwd}! You can specify --create flag to create an empty working directory")
     fs.chdir(args.cwd)
 
-def get_args(line: str) -> Namespace:
+def get_args(line: str) -> BashArgumentNamespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--d", "--cwd", dest="cwd", type=str, default=".", help="Working directory")
     parser.add_argument("--create", action='store_true', default=False, help="Create the working directory if not existing. Do nothing if the directory exists")
@@ -153,14 +158,22 @@ def get_args(line: str) -> Namespace:
     parser.add_argument("-b", "--backend", type=str, default="plain")
     parser.add_argument("--logLevel", type=int, choices=[DEBUG, INFO, ERROR], default=ERROR)
     parser.add_argument("--height", type=int, default=10)
+    parser.add_argument("--bg", "--background", 
+                            dest="background",
+                            action='store_true',
+                            default=False)
+    parser.add_argument("--outfile", "--outFile",
+                            dest="outFile",
+                            type=str,
+                            default=None)
     line = line.strip('\n').strip(' ').lstrip('%%bash')
     if line:
-        args = parser.parse_args(line.split(' '))
+        args = parser.parse_args(line.split(' '), namespace=BashArgumentNamespace())
     else:
-        args = parser.parse_args([])
+        args = parser.parse_args([], namespace=BashArgumentNamespace())
     return args
 
-def _bash(args: Namespace, fs: IFileSystem, cell: str):
+def _bash(args: BashArgumentNamespace, fs: IFileSystem, cell: str):
     logger.debug("Current dir: %s", fs.getcwd())
     logger.debug(args)
 
@@ -170,6 +183,8 @@ def _bash(args: Namespace, fs: IFileSystem, cell: str):
                         backend=args.backend, 
                         height=args.height, 
                         container=args.container, 
+                        background=args.background,
+                        outFile=args.outFile,
                         fs=fs,
                         logger=logger)
 
