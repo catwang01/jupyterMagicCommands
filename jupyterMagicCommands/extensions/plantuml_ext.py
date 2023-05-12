@@ -1,9 +1,7 @@
 from IPython.display import Image
 from io import StringIO
-from IPython.core.magic import register_cell_magic
 from plantuml import PlantUML
 
-@register_cell_magic
 def plantuml(line, cell):
     url = 'http://www.plantuml.com/plantuml/img/'
     processor = PlantUML(url)

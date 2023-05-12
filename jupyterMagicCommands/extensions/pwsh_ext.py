@@ -1,13 +1,9 @@
 import os
 import time
-import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from IPython.core.magic import register_cell_magic
-from subprocess import Popen, PIPE
-from .utils import executeCmd
+from jupyterMagicCommands.utils.cmd import executeCmd
 
-@register_cell_magic
 def pwsh(line, cell):
     encoding = 'utf8'
     with TemporaryDirectory() as tmpdirname:

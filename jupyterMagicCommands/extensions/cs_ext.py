@@ -1,15 +1,10 @@
-import sys
-import re
-from io import StringIO
-from IPython.core.magic import register_cell_magic
-import os
-from tempfile import TemporaryDirectory
 import argparse
-import time
-from pathlib import Path
-import subprocess
 import logging
-from .utils import executeCmd
+import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from jupyterMagicCommands.utils.cmd import executeCmd
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -62,20 +57,21 @@ def completeCode(code, args):
     return code
 
 def runCsharp(cell, args):
-    code = completeCode(cell, args)
+    # since C#9, there is no need to have a Main
+    # code = completeCode(cell, args)
+    code = cell
     logger.debug(code)
-    verbose = args.debug
+    verbose = args.verbose
     with TemporaryDirectory() as tmpDir:
         executeCmd(f"dotnet new console", cwd=tmpDir, verbose=verbose)
         tmpFile = Path(tmpDir) / 'Program.cs'
-        logger.debug(code)
         tmpFile.write_text(code)
         for packageInfo in args.packageInfos:
             if "version" in packageInfo:
                 executeCmd(f"dotnet add package {packageInfo['name']} --verion {packageInfo['version']}", cwd=tmpDir, verbose=verbose)
             else:
                 executeCmd(f"dotnet add package {packageInfo['name']}", cwd=tmpDir, verbose=verbose)
-        executeCmd("dotnet run", cwd=tmpDir)
+        executeCmd("dotnet run", cwd=tmpDir, verbose=True)
                 
 def transformLogLevel(s):
     level = {
@@ -83,7 +79,7 @@ def transformLogLevel(s):
         "DEBUG": logging.DEBUG
     }.get(s.upper())
     if level is None:
-        print(f"Unsupported level: {level}")
+        print(f"Unsupported level: {s}")
         sys.exit(1)
     return level
 
@@ -99,18 +95,17 @@ def processPackageInfo(s):
         raise Exception(f"Not a valid package info: {s}. Package info should be <package-name> or <package-name>:<version>")
     return ret
 
-                
-@register_cell_magic
 def cs(line, cell):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--logLevel', default=logging.INFO, type=transformLogLevel)
+    parser.add_argument('--logLevel', default='INFO', type=transformLogLevel)
     parser.add_argument('--addPackage', dest="packageInfos", type=processPackageInfo , action="append" , default=[])
-    parser.add_argument('--debug', action="store_true", default=False)
+    parser.add_argument('--verbose', action="store_true", default=False)
     if line.strip() != '':
         args = parser.parse_args(line.strip(' ').split(' '))
     else:
         args = parser.parse_args([])
     logger.setLevel(args.logLevel)
+    logger.debug("args: %s", args)
     runCsharp(cell, args)
     
 def load_ipython_extension(ipython):
