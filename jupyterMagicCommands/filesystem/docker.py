@@ -1,8 +1,9 @@
 import os
+import selectors
+import types
 import functools
 import tempfile
 from typing import IO, Optional, List
-
 from docker.models.containers import Container, ExecResult
 
 from jupyterMagicCommands.mixins.logmixin import LogMixin
@@ -117,11 +118,51 @@ rm -rf '{path}'
             if results.exit_code and results.exit_code != 0:
                 raise Exception(results.output.decode())
         else:
-            results = self._execute_cmd(cmd, stream=True)
+            results = self._execute_cmd(cmd, stdin=True, tty=True, socket=True)
             if results.exit_code is not None and results.exit_code != 0:
                 raise Exception(results)
-            for line in results.output:
-                print(line.decode('utf8'), end="")
+            self._handle_socket(results)
+
+    def _handle_socket(self, results: ExecResult) -> None:
+        sock = results.output._sock
+
+        sock.setblocking(False)
+        sel = selectors.DefaultSelector()
+
+        def read(key, mask):
+            conn = key.fileobj
+            dataToSend = key.data.dataToSend
+            def close_sock():
+                self.logger.debug('closing', conn)
+                sel.unregister(conn)
+                conn.close()
+            if mask & selectors.EVENT_READ:
+                length = 1024
+                data = conn.recv(length)
+                if not data:
+                    close_sock()
+                    return
+                print(data.decode("utf8"), end="")
+            if mask & selectors.EVENT_WRITE and dataToSend:
+                data = dataToSend.pop(0)
+                conn.send(data)  # Should be ready
+
+        data = types.SimpleNamespace(callback=read, dataToSend=[])
+        sel.register(sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data)
+
+        def get_registered_socket_count():
+            return len(sel.get_map())
+
+        shouldContinue = True
+        while shouldContinue:
+            try:
+                events = sel.select()
+                for key, mask in events:
+                    callback = key.data.callback
+                    callback(key, mask)
+                shouldContinue = get_registered_socket_count() != 0
+            except KeyboardInterrupt:
+                data.dataToSend.append(b"\x03")
 
     class FileInContainerWrapper:
 
