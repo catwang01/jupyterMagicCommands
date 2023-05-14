@@ -1,13 +1,15 @@
 import os
+import time
+import selectors
+import types
 import functools
 import tempfile
 from typing import IO, Optional, List
-
 from docker.models.containers import Container, ExecResult
 
 from jupyterMagicCommands.mixins.logmixin import LogMixin
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
-from jupyterMagicCommands.utils.docker import copy_to_container
+from jupyterMagicCommands.utils.docker import copy_to_container, copy_from_container
 
 class DirectoryNotExist(Exception):
     pass
@@ -37,6 +39,9 @@ class DockerFileSystem(IFileSystem, LogMixin):
 
     def copy_to_container(self, src: str, dst: str):
         copy_to_container(self.container, src, dst)
+
+    def copy_from_container(self, src: str, dst: str):
+        copy_from_container(self.container, src, dst)
 
     def _execute_cmd(self, cmd: str, 
                             background: bool=False, 
@@ -81,9 +86,21 @@ mkdir -p '{path}'
         if results.exit_code != 0:
             raise Exception(output)
 
-    def open(self, filename: str, mode: str="w+", encoding: str='utf8') -> IO:
-        f = tempfile.NamedTemporaryFile(mode, encoding=encoding)
-        return self.FileInContainerWrapper(self.container, f, filename)
+    def _is_mode_require_file_exists(self, mode: str) -> bool:
+        return 'r' in mode or 'a' in mode
+
+    def _get_temp_file_path(self) -> str:
+        return f"/tmp/{time.time()}"
+
+    def open(self, filename: str, mode: str="w+", encoding: str='utf8', **kwargs) -> IO:
+        f: IO
+        if self._is_mode_require_file_exists(mode):
+            temp_file_path = self._get_temp_file_path()
+            self.copy_from_container(filename, temp_file_path)
+            f = open(temp_file_path, mode=mode, encoding=encoding, **kwargs)
+        else:
+            f = tempfile.NamedTemporaryFile(mode=mode, encoding=encoding, **kwargs)
+        return self.FileInContainerWrapper(self, f, filename)
 
     def getcwd(self) -> str:
         results = self._execute_cmd('pwd')
@@ -117,16 +134,56 @@ rm -rf '{path}'
             if results.exit_code and results.exit_code != 0:
                 raise Exception(results.output.decode())
         else:
-            results = self._execute_cmd(cmd, stream=True)
+            results = self._execute_cmd(cmd, stdin=True, tty=True, socket=True)
             if results.exit_code is not None and results.exit_code != 0:
                 raise Exception(results)
-            for line in results.output:
-                print(line.decode('utf8'), end="")
+            self._handle_socket(results)
+
+    def _handle_socket(self, results: ExecResult) -> None:
+        sock = results.output._sock
+
+        sock.setblocking(False)
+        sel = selectors.DefaultSelector()
+
+        def read(key, mask):
+            conn = key.fileobj
+            dataToSend = key.data.dataToSend
+            def close_sock():
+                self.logger.debug('closing', conn)
+                sel.unregister(conn)
+                conn.close()
+            if mask & selectors.EVENT_READ:
+                length = 1024
+                data = conn.recv(length)
+                if not data:
+                    close_sock()
+                    return
+                print(data.decode("utf8"), end="")
+            if mask & selectors.EVENT_WRITE and dataToSend:
+                data = dataToSend.pop(0)
+                conn.send(data)  # Should be ready
+
+        data = types.SimpleNamespace(callback=read, dataToSend=[])
+        sel.register(sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data)
+
+        def get_registered_socket_count():
+            return len(sel.get_map())
+
+        shouldContinue = True
+        while shouldContinue:
+            try:
+                events = sel.select()
+                for key, mask in events:
+                    callback = key.data.callback
+                    callback(key, mask)
+                shouldContinue = get_registered_socket_count() != 0
+            except KeyboardInterrupt:
+                data.dataToSend.append(b"\x03")
 
     class FileInContainerWrapper:
 
-        def __init__(self, container: Container, file: IO, path: str):
-            self.container = container
+        def __init__(self, docker: 'DockerFileSystem', file: IO, path: str):
+            self.docker = docker
             self.file = file
             self.path = path 
 
@@ -164,7 +221,7 @@ rm -rf '{path}'
             Copy the temporary file, and close it
             """
             self.file.seek(0)
-            copy_to_container(self.container, self.file.name, self.path)
+            self.docker.copy_to_container(self.file.name, self.path)
             self.file.close()
 
         # iter() doesn't use __getattr__ to find the __iter__ method

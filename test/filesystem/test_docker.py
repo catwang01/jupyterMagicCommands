@@ -8,7 +8,7 @@ def client():
     client = docker.from_env()
     return client
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def container(client):
     containerName = "test"
     try:
@@ -28,12 +28,13 @@ class TestDockerFileSystem:
     def test_if_default_shell_can_be_detect_correctly(self, dockerfilesystem):
         assert dockerfilesystem.default_shell == "bash"
 
-    def test_check_whether_file_exists_in_container(self, dockerfilesystem):
-        dockerfilesystem.makedirs('/a/b/c')
-        assert dockerfilesystem.exists('/a/b/c') == True
+    def test_check_whether_file_exists_in_container(self, tmp_path, dockerfilesystem):
+        path = f'{tmp_path}/a/b/c'
+        dockerfilesystem.makedirs(path)
+        assert dockerfilesystem.exists(path) == True
 
-    def test_write_file_to_container(self, container, dockerfilesystem):
-        path = '/app/a/b/c/test.txt'
+    def test_write_file_to_container(self, tmp_path, container, dockerfilesystem):
+        path = f'/{tmp_path}/app/a/b/c/test.txt'
         with dockerfilesystem.open(path, 'w', encoding='utf8') as f:
             f.write('hello')
             f.write('hello')
@@ -41,8 +42,8 @@ class TestDockerFileSystem:
         assert dockerfilesystem.exists(path)
         assert container.exec_run(f'cat {path}').output.decode() == "hellohello"
 
-    def test_chdir_and_getcwd_in_container(self, dockerfilesystem):
-        path = '/test'
+    def test_chdir_and_getcwd_in_container(self, tmp_path, dockerfilesystem):
+        path = f'{tmp_path}/test'
         assert dockerfilesystem.getcwd() == '/'
 
         dockerfilesystem.makedirs(path)
@@ -51,25 +52,25 @@ class TestDockerFileSystem:
         dockerfilesystem.chdir(path)
         assert dockerfilesystem.getcwd() == path
 
-    def test_chdir_to_relative_path_and_getcwd_in_container(self, dockerfilesystem):
-        path = 'test'
+    def test_chdir_to_relative_path_and_getcwd_in_container(self, tmp_path, dockerfilesystem):
+        path = f'{tmp_path}/test'
         assert dockerfilesystem.getcwd() == '/'
 
         dockerfilesystem.makedirs(path)
         assert dockerfilesystem.exists(path) == True
 
         dockerfilesystem.chdir(path)
-        assert dockerfilesystem.getcwd() == '/test'
+        assert dockerfilesystem.getcwd() == path
 
-        path2 = '/hello/world'
+        path2 = f'{tmp_path}/hello/world'
         dockerfilesystem.makedirs(path2)
         assert dockerfilesystem.exists(path2) == True
 
         dockerfilesystem.chdir(path2)
         assert dockerfilesystem.getcwd() == path2
 
-    def test_removedirs_in_container(self, dockerfilesystem):
-        path = '/app/a/b/c/test.txt'
+    def test_removedirs_in_container(self, tmp_path, dockerfilesystem):
+        path = f'{tmp_path}/app/a/b/c/test.txt'
 
         assert dockerfilesystem.exists(path) == False
 
@@ -80,3 +81,18 @@ class TestDockerFileSystem:
 
         dockerfilesystem.removedirs(path)
         assert dockerfilesystem.exists(path) == False
+
+    def test_file_append(self, tmp_path, container, dockerfilesystem):
+        path = f'{tmp_path}/test.txt'
+
+        with dockerfilesystem.open(path, 'w', encoding='utf8') as f:
+            f.write('hello')
+        assert container.exec_run(f'cat {path}').output.decode() == "hello"
+
+        with dockerfilesystem.open(path, 'a', encoding='utf8') as f:
+            f.write(' world')
+        assert container.exec_run(f'cat {path}').output.decode() == "hello world"
+
+        with dockerfilesystem.open(path, 'r', encoding='utf8') as f:
+            s = f.read()
+        assert s == "hello world"
