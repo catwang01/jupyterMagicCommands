@@ -8,5 +8,5 @@ setuptools.setup(
     description="Some useful magic commands for juypter",
     packages=setuptools.find_packages(),
     python_requires=">=3.6",
-    install_requires=['ipython', 'plantuml', 'pandas', 'requests', "pytest"]
+    install_requires=['ipython', 'plantuml', 'pandas', 'requests', "pytest", "docker"]
 )
