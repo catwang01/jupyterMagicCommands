@@ -1,12 +1,20 @@
+import logging
 import os
 import subprocess
-from IPython import get_ipython
 import tempfile
 from typing import IO, Optional
+
+from IPython import get_ipython
+
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.mixins.logmixin import LogMixin
+from jupyterMagicCommands.utils.log import NULL_LOGGER
 
-class FileSystem(IFileSystem, LogMixin):
+
+class FileSystem(IFileSystem):
+
+    def __init__(self, logger: logging.Logger=NULL_LOGGER):
+        self.logger = logger
 
     def exists(self, path: str) -> bool:
         return os.path.exists(path)

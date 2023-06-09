@@ -1,27 +1,32 @@
-import os
-import time
-import selectors
-import types
 import functools
+import logging
+import os
+import selectors
 import tempfile
-from typing import IO, Optional, List
+import time
+import types
+from typing import IO, List, Optional
+
 from docker.models.containers import Container, ExecResult
 
-from jupyterMagicCommands.mixins.logmixin import LogMixin
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
-from jupyterMagicCommands.utils.docker import copy_to_container, copy_from_container
+from jupyterMagicCommands.utils.docker import (copy_from_container,
+                                               copy_to_container)
+from jupyterMagicCommands.utils.log import NULL_LOGGER
+
 
 class DirectoryNotExist(Exception):
     pass
 
 SHELL_DETECT_LIST = ["fish", "bash", "sh", "ash"]
 
-class DockerFileSystem(IFileSystem, LogMixin):
-    def __init__(self, container: Container, workdir: str = '/') -> None:
+class DockerFileSystem(IFileSystem):
+    def __init__(self, container: Container, workdir: str = '/', logger: logging.Logger=NULL_LOGGER) -> None:
         self.container = container
         self._workdir = workdir
         self._default_shell: Optional[str] = None
         self._default_shell_checked: bool = False
+        self.logger = logger
         
     @property
     def default_shell(self) -> Optional[str]:
