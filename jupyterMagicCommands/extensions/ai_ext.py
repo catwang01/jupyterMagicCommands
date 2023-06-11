@@ -2,7 +2,6 @@ from IPython.core.magic import register_cell_magic
 from IPython import get_ipython 
 import os
 
-@register_cell_magic
 def openai_magic(line, cell):
     import openai
 
@@ -24,3 +23,6 @@ def openai_magic(line, cell):
     )
     output = response.choices[0].message.content
     get_ipython().set_next_input(output)
+
+def load_ipython_extension(ipython):
+    ipython.register_magic_function(openai_magic, 'cell')
