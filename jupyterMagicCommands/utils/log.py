@@ -1,3 +1,16 @@
 import logging
-NULL_LOGGER = logging.getLogger('foo')
+from logging import DEBUG, INFO
+NULL_LOGGER = logging.getLogger('__null__')
 NULL_LOGGER.addHandler(logging.NullHandler())  # read below for reason
+
+def getLogger(name: str) -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(DEBUG)
+
+    streamhandler = logging.StreamHandler()
+    streamhandler.setLevel(INFO)
+
+    formatter = logging.Formatter("%(asctime)s - %(filename)s - %(name)s - %(levelname)s - %(message)s")
+    streamhandler.setFormatter(formatter)
+    logger.addHandler(streamhandler)
+    return logger
