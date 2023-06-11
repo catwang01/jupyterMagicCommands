@@ -104,9 +104,6 @@ def queryClickHousePlayGround(query: str, url: str, args: argparse.Namespace):
             print("Only format JSON supports output!")
     return ret
 
-def load_ipython_extension(ipython):
-    ipython.register_magic_function(ck, 'cell')
-
 def parseDataset(dataset: str) -> str:
     defaultUrl = "https://play.clickhouse.com:443"
     return {"ontime": "https://gh-api.clickhouse.com/play"}.get(dataset, defaultUrl)
@@ -118,3 +115,6 @@ def getParser():
     parser.add_argument('--format', type=str, default='PrettyCompact', choices=list(FormatHandlerFactory.handlers.keys()))
     parser.add_argument('--output', type=str)
     return parser
+
+def load_ipython_extension(ipython):
+    ipython.register_magic_function(ck, 'cell')
