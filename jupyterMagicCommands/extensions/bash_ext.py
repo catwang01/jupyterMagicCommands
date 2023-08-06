@@ -1,27 +1,20 @@
 import argparse
-import logging
 import tempfile
 import time
 from dataclasses import dataclass
-from logging import DEBUG, ERROR, INFO
+from logging import ERROR, Logger
 from typing import Optional
 
 import pexpect
 from IPython.display import display
+from jupyterMagicCommands.utils.parser import parse_logLevel
 
 from jupyterMagicCommands.filesystem.filesystem_factory import \
     FileSystemFactory
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
+from jupyterMagicCommands.utils.log import NULL_LOGGER, getLogger
 
-logger = logging.getLogger(__name__)
-logger.setLevel(ERROR)
-
-streamhandler = logging.StreamHandler()
-streamhandler.setLevel(DEBUG)
-
-formatter = logging.Formatter("%(asctime)s - %(filename)s - %(name)s - %(levelname)s - %(message)s")
-streamhandler.setFormatter(formatter)
-logger.addHandler(streamhandler)
+global_logger = getLogger(__name__)
 
 template = """
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.5.0/css/xterm.css" />
@@ -76,7 +69,7 @@ def sendToTerminal(termName, displayHandler, message, prevMessage=None):
     displayHandler.update({'text/html': template}, raw=True)
 
 def plainExecuteCommand(command, verbose=False, **kwargs):
-    logger = kwargs.get('logger', logging.getLogger(__name__))
+    logger = kwargs.get('logger', NULL_LOGGER)
     logger.debug('### Parameters starts ###')
     logger.debug(f"command: '{command}'")
     logger.debug(f"verbose: '{verbose}'")
@@ -92,7 +85,7 @@ def plainExecuteCommand(command, verbose=False, **kwargs):
         raise Exception("FileSystem is not initliazed for a container!")
 
 def xtermExecuteCommand(command, verbose=False, **kwargs):
-    logger = kwargs.get('logger', logging.getLogger(__name__))
+    logger = kwargs.get('logger', NULL_LOGGER)
     if verbose:
         print(command)
     encoding = 'utf8'
@@ -134,7 +127,7 @@ def preprocessCommand(command: str, args: BashArgumentNamespace) -> str:
     """
     return command
 
-def prepare(args: BashArgumentNamespace, fs: IFileSystem):
+def _prepare(args: BashArgumentNamespace, fs: IFileSystem, logger: Logger) -> None:
     if fs.exists(args.cwd):
         logger.debug("Folder %r exists", args.cwd)
         if args.initialize:
@@ -156,7 +149,7 @@ def get_args(line: str) -> BashArgumentNamespace:
     parser.add_argument('-c', '--container', help="docker container name or id, if this is specified, the command would run in the specified container ")
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
     parser.add_argument("-b", "--backend", type=str, default="plain")
-    parser.add_argument("--logLevel", type=int, choices=[DEBUG, INFO, ERROR], default=ERROR)
+    parser.add_argument("--logLevel", type=parse_logLevel, default="ERROR")
     parser.add_argument("--height", type=int, default=10)
     parser.add_argument("--bg", "--background", 
                             dest="background",
@@ -174,11 +167,11 @@ def get_args(line: str) -> BashArgumentNamespace:
     return args
 
 def _bash(args: BashArgumentNamespace, fs: IFileSystem, cell: str):
-    logger.debug("Current dir: %s", fs.getcwd())
-    logger.debug(args)
+    global_logger.debug("Current dir: %s", fs.getcwd())
+    global_logger.debug(args)
 
     command = preprocessCommand(cell, args)
-    prepare(args, fs)
+    _prepare(args, fs, global_logger)
     executeCmd(command, verbose=args.verbose, 
                         backend=args.backend, 
                         height=args.height, 
@@ -186,11 +179,11 @@ def _bash(args: BashArgumentNamespace, fs: IFileSystem, cell: str):
                         background=args.background,
                         outFile=args.outFile,
                         fs=fs,
-                        logger=logger)
+                        logger=global_logger)
 
 def bash(line: str, cell: str):
     args = get_args(line)
-    logger.setLevel(args.logLevel)
+    global_logger.setLevel(args.logLevel)
     fs = FileSystemFactory.get_filesystem(args.container)
     olddir = fs.getcwd()
     try:
