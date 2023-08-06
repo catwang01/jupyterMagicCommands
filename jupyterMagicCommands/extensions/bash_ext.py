@@ -149,7 +149,7 @@ def get_args(line: str) -> BashArgumentNamespace:
     parser.add_argument('-c', '--container', help="docker container name or id, if this is specified, the command would run in the specified container ")
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
     parser.add_argument("-b", "--backend", type=str, default="plain")
-    parser.add_argument("--logLevel", type=parse_logLevel, choices=["DEBUG", "INFO", "ERROR", "WARN"], default="ERROR")
+    parser.add_argument("--logLevel", type=parse_logLevel, default="ERROR")
     parser.add_argument("--height", type=int, default=10)
     parser.add_argument("--bg", "--background", 
                             dest="background",
