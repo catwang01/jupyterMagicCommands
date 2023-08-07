@@ -31,7 +31,7 @@ template = """
         window.%(termName)s.open(document.getElementById('%(termName)s'));
     </script>
     </div>
-""" 
+"""
 
 class NotValidBackend(Exception):
     pass
@@ -61,7 +61,7 @@ def sendToTerminal(termName, displayHandler, message, prevMessage=None):
         currentMessage = message[len(prevMessage):]
     unicodeArray = [ord(ch) for ch in currentMessage]
     template = f"""
-<script> 
+<script>
     // window.{termName}.clear();
     window.{termName}.write({unicodeArray});
 </script>
@@ -78,8 +78,8 @@ def plainExecuteCommand(command, verbose=False, **kwargs):
     if verbose:
         print(command)
     if kwargs.get('fs', None) is not None:
-        kwargs['fs'].system(command, 
-                            background=kwargs.get('background'), 
+        kwargs['fs'].system(command,
+                            background=kwargs.get('background'),
                             outFile=kwargs.get('outFile'))
     else:
         raise Exception("FileSystem is not initliazed for a container!")
@@ -151,7 +151,7 @@ def get_args(line: str) -> BashArgumentNamespace:
     parser.add_argument("-b", "--backend", type=str, default="plain")
     parser.add_argument("--logLevel", type=parse_logLevel, default="ERROR")
     parser.add_argument("--height", type=int, default=10)
-    parser.add_argument("--bg", "--background", 
+    parser.add_argument("--bg", "--background",
                             dest="background",
                             action='store_true',
                             default=False)
@@ -172,10 +172,10 @@ def _bash(args: BashArgumentNamespace, fs: IFileSystem, cell: str):
 
     command = preprocessCommand(cell, args)
     _prepare(args, fs, global_logger)
-    executeCmd(command, verbose=args.verbose, 
-                        backend=args.backend, 
-                        height=args.height, 
-                        container=args.container, 
+    executeCmd(command, verbose=args.verbose,
+                        backend=args.backend,
+                        height=args.height,
+                        container=args.container,
                         background=args.background,
                         outFile=args.outFile,
                         fs=fs,
