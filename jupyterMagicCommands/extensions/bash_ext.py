@@ -111,6 +111,39 @@ def xtermExecuteCommand(command, verbose=False, **kwargs):
             except KeyboardInterrupt:
                 child.sendintr()
 
+import asyncio
+
+def wait_for_change(widget, value):
+    future = asyncio.Future()
+    def getvalue(change):
+        # make the new value available
+        future.set_result(change.new)
+        widget.unobserve(getvalue, value)
+    widget.observe(getvalue, value)
+    return future
+
+async def run_command(child, out):
+    prevMessage = ""
+    while True:
+        try:
+            i = await child.expect_list(
+                [pexpect.TIMEOUT, pexpect.EOF], 
+                timeout=0.2, 
+                async_=True
+            ) # fresh terminal per 0.2s
+            message = child.before.decode()
+            out.append_stdout(message[len(prevMessage):])
+            prevMessage = message
+            if i != 0:
+                break
+        except KeyboardInterrupt:
+            child.sendintr()
+
+async def on_submit(child, widget, out):
+    while True:
+        x = await wait_for_change(widget, 'value')
+        child.sendline(x)
+
 def interactiveExecuteCommand(command, verbose=False, **kwargs):
     logger = kwargs.get('logger', NULL_LOGGER)
     if verbose:
@@ -123,26 +156,9 @@ def interactiveExecuteCommand(command, verbose=False, **kwargs):
         logger.debug(cmd)
         child = pexpect.spawn(cmd)
         out = widgets.Output()
-        text = widgets.Text(value='Hello World!')
-
-        def on_submit(widget):
-            print(widget.value)
-            child.sendline(widget.value)
-
-        text.on_submit(on_submit)
+        text = widgets.Text(placeholder='input', continuous_update=False)
         display(widgets.VBox([out, text]))
-        prevMessage = ""
-        while True:
-            try:
-                i = child.expect_list([pexpect.TIMEOUT, pexpect.EOF], timeout=0.2) # fresh terminal per 0.2s
-                message = child.before.decode()
-                out.append_stdout(message[len(prevMessage):])
-                prevMessage = message
-                if i != 0:
-                    break
-            except KeyboardInterrupt:
-                child.sendintr()
-
+        asyncio.ensure_future(asyncio.gather(on_submit(child, text, out), run_command(child, out)))
 
 def executeCmd(*args, backend="plain", **kwargs):
     if backend == "plain":
