@@ -1,4 +1,5 @@
 import argparse
+import ipywidgets as widgets
 import tempfile
 import time
 from dataclasses import dataclass
@@ -110,16 +111,50 @@ def xtermExecuteCommand(command, verbose=False, **kwargs):
             except KeyboardInterrupt:
                 child.sendintr()
 
+def interactiveExecuteCommand(command, verbose=False, **kwargs):
+    logger = kwargs.get('logger', NULL_LOGGER)
+    if verbose:
+        print(command)
+    encoding = 'utf8'
+    with tempfile.NamedTemporaryFile(encoding=encoding, mode='w') as fp:
+        fp.write(command)
+        fp.seek(0)
+        cmd = f"bash '{fp.name}'"
+        logger.debug(cmd)
+        child = pexpect.spawn(cmd)
+        out = widgets.Output()
+        text = widgets.Text(value='Hello World!')
+
+        def on_submit(widget):
+            print(widget.value)
+            child.sendline(widget.value)
+
+        text.on_submit(on_submit)
+        display(widgets.VBox([out, text]))
+        prevMessage = ""
+        while True:
+            try:
+                i = child.expect_list([pexpect.TIMEOUT, pexpect.EOF], timeout=0.2) # fresh terminal per 0.2s
+                message = child.before.decode()
+                out.append_stdout(message[len(prevMessage):])
+                prevMessage = message
+                if i != 0:
+                    break
+            except KeyboardInterrupt:
+                child.sendintr()
+
+
 def executeCmd(*args, backend="plain", **kwargs):
     if backend == "plain":
         plainExecuteCommand(*args, **kwargs)
+    elif backend == 'interactive':
+        interactiveExecuteCommand(*args, **kwargs)
     elif backend == "xterm":
         if kwargs.get('container', None) is not None:
             raise Exception(f"Backend {backend} doesn't suppor docker running in a container")
         xtermExecuteCommand(*args, **kwargs)
     else:
         raise NotValidBackend(f"Not a valid backend {backend}")
-
 
 def preprocessCommand(command: str, args: BashArgumentNamespace) -> str:
     """
@@ -187,7 +222,10 @@ def bash(line: str, cell: str):
     fs = FileSystemFactory.get_filesystem(args.container)
     olddir = fs.getcwd()
     try:
+        print("hello")
         _bash(args, fs, cell)
+    except Exception as e:
+        print(e)
     finally:
         fs.chdir(olddir)
 

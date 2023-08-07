@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="JupyterMagicCommands", # distribution package  name
-    version="0.1.0",
+    version="0.1.2",
     author="ed",
     author_email="edwardelricwzx@example.com",
     description="Some useful magic commands for juypter",
