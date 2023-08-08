@@ -9,7 +9,7 @@ from typing import IO, List, Optional
 
 from docker.models.containers import Container, ExecResult
 
-from jupyterMagicCommands.outputters.interactive_outputter import InteractiveOutputter
+from jupyterMagicCommands.outputters import InteractiveOutputter, NonInteractiveOutputter, AbstractOutputter
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.utils.docker import (copy_from_container,
                                                copy_to_container)
@@ -135,6 +135,7 @@ rm -rf '{path}'
 
     def system(self, cmd: str,
                 background: bool=False,
+                interactive: bool=False,
                 outFile: Optional[str]=None) -> None:
         if background:
             results = self._execute_cmd(cmd, background=background, outFile=outFile, detach=True)
@@ -144,14 +145,14 @@ rm -rf '{path}'
             results = self._execute_cmd(cmd, stdin=True, tty=True, socket=True)
             if results.exit_code is not None and results.exit_code != 0:
                 raise Exception(results)
-            self._handle_socket(results)
+            outputter = InteractiveOutputter() if interactive else NonInteractiveOutputter()
+            self._handle_socket(results, outputter)
 
-    def _handle_socket(self, results: ExecResult) -> None:
+    def _handle_socket(self, results: ExecResult, outputter: AbstractOutputter) -> None:
         sock = results.output._sock
 
         sock.setblocking(False)
         sel = selectors.DefaultSelector()
-        outputter = InteractiveOutputter()
 
         def read(key, mask):
             conn = key.fileobj

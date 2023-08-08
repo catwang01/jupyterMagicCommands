@@ -1,4 +1,4 @@
-from typing import IO
+from typing import IO, Optional
 from abc import abstractmethod, ABCMeta
 
 class IFileSystem(metaclass=ABCMeta):
@@ -26,8 +26,7 @@ class IFileSystem(metaclass=ABCMeta):
     @abstractmethod
     def removedirs(self, path: str) -> None:
         pass
-     
+
     @abstractmethod
-    def system(self, path: str) -> None:
+    def system(self, cmd: str, background: bool=False, interactive: bool=False, outFile: Optional[str]=None) -> None:
         pass
-        

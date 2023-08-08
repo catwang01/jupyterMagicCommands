@@ -1,4 +1,5 @@
 import argparse
+from operator import itemgetter
 import asyncio
 import tempfile
 import time
@@ -9,10 +10,11 @@ from typing import Optional
 import pexpect
 from IPython.display import display
 
-from jupyterMagicCommands.outputters.async_interactive_outputter import AsyncInteractiveOutputter
 from jupyterMagicCommands.filesystem.filesystem_factory import \
     FileSystemFactory
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
+from jupyterMagicCommands.outputters.async_interactive_outputter import \
+    AsyncInteractiveOutputter
 from jupyterMagicCommands.utils.functools import suppress
 from jupyterMagicCommands.utils.log import NULL_LOGGER, getLogger
 from jupyterMagicCommands.utils.parser import parse_logLevel
@@ -40,7 +42,8 @@ class NotValidBackend(Exception):
     pass
 
 @dataclass
-class BashArgumentNamespace:
+class BashArgsNS:
+    force_create: bool=False
     cwd: str = '.'
     create: bool = False
     initialize: bool = False
@@ -71,8 +74,10 @@ def sendToTerminal(termName, displayHandler, message, prevMessage=None):
 """
     displayHandler.update({'text/html': template}, raw=True)
 
-def plainExecuteCommand(command, verbose=False, **kwargs):
+def plainExecuteCommand(command: str, args: BashArgsNS, **kwargs):
     logger = kwargs.get('logger', NULL_LOGGER)
+    
+    verbose, background, interactive, outFile = itemgetter('verbose', 'background', 'interactive', 'outFile')(vars(args))
     logger.debug('### Parameters starts ###')
     logger.debug(f"command: '{command}'")
     logger.debug(f"verbose: '{verbose}'")
@@ -82,13 +87,15 @@ def plainExecuteCommand(command, verbose=False, **kwargs):
         print(command)
     if kwargs.get('fs', None) is not None:
         kwargs['fs'].system(command,
-                            background=kwargs.get('background'),
-                            outFile=kwargs.get('outFile'))
+                            background=background,
+                            interactive=interactive,
+                            outFile=outFile)
     else:
         raise Exception("FileSystem is not initliazed for a container!")
 
-def xtermExecuteCommand(command, verbose=False, **kwargs):
+def xtermExecuteCommand(command: str, args: BashArgsNS, **kwargs):
     logger = kwargs.get('logger', NULL_LOGGER)
+    verbose, height = itemgetter('verbose', 'height')(vars(args))
     if verbose:
         print(command)
     encoding = 'utf8'
@@ -99,7 +106,7 @@ def xtermExecuteCommand(command, verbose=False, **kwargs):
         logger.debug(cmd)
         child = pexpect.spawn(cmd)
         initialOptions = {
-            'rows': kwargs.get('height', 10)
+            'rows': height
         }
         termName, displayHandler = initTerminal(initialOptions)
         prevMessage = ""
@@ -113,61 +120,27 @@ def xtermExecuteCommand(command, verbose=False, **kwargs):
             except KeyboardInterrupt:
                 child.sendintr()
 
-
-async def run_command(child, outputter: 'Outputter'):
-    prevMessage = ""
-    while True:
-        try:
-            i = await child.expect_list(
-                [pexpect.TIMEOUT, pexpect.EOF],
-                timeout=0.2,
-                async_=True
-            ) # fresh terminal per 0.2s
-            message = child.before.decode()
-            outputter.write(message[len(prevMessage):])
-            prevMessage = message
-            if i != 0:
-                break
-        except KeyboardInterrupt:
-            child.sendintr()
-
-def interactiveExecuteCommand(command, verbose=False, **kwargs):
-    logger = kwargs.get('logger', NULL_LOGGER)
-    if verbose:
-        print(command)
-    encoding = 'utf8'
-    with tempfile.NamedTemporaryFile(encoding=encoding, mode='w') as fp:
-        fp.write(command)
-        fp.seek(0)
-        cmd = f"bash '{fp.name}'"
-        logger.debug(cmd)
-        child = pexpect.spawn(cmd)
-        outputter = AsyncInteractiveOutputter()
-        outputter.register_read_callback(child.sendline)
-        asyncio.ensure_future(asyncio.gather(outputter.on_read(), run_command(child, outputter)))
-
-def executeCmd(*args, backend="plain", **kwargs):
+def executeCmd(command: str, args: BashArgsNS, **kwargs):
+    backend = args.backend
     if backend == "plain":
-        plainExecuteCommand(*args, **kwargs)
-    elif backend == 'interactive':
-        interactiveExecuteCommand(*args, **kwargs)
+        plainExecuteCommand(command, args, **kwargs)
     elif backend == "xterm":
         if kwargs.get('container', None) is not None:
             raise Exception(f"Backend {backend} doesn't suppor docker running in a container")
-        xtermExecuteCommand(*args, **kwargs)
+        xtermExecuteCommand(command, args, **kwargs)
     else:
         raise NotValidBackend(f"Not a valid backend {backend}")
 
-def preprocessCommand(command: str, args: BashArgumentNamespace) -> str:
+def preprocessCommand(command: str, args: BashArgsNS) -> str:
     """
     Currently no preprocess is needed
     """
     return command
 
-def _prepare(args: BashArgumentNamespace, fs: IFileSystem, logger: Logger) -> None:
+def _prepare(args: BashArgsNS, fs: IFileSystem, logger: Logger) -> None:
     if fs.exists(args.cwd):
         logger.debug("Folder %r exists", args.cwd)
-        if args.initialize:
+        if args.force_create:
             fs.removedirs(args.cwd)
     else:
         logger.debug("Folder %r doesn't exist", args.cwd)
@@ -178,45 +151,44 @@ def _prepare(args: BashArgumentNamespace, fs: IFileSystem, logger: Logger) -> No
             raise Exception(f"Accessing non existing working directory: {args.cwd}! You can specify --create flag to create an empty working directory")
     fs.chdir(args.cwd)
 
-def get_args(line: str) -> BashArgumentNamespace:
+def get_args(line: str) -> BashArgsNS:
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--d", "--cwd", dest="cwd", type=str, default=".", help="Working directory")
     parser.add_argument("--create", action='store_true', default=False, help="Create the working directory if not existing. Do nothing if the directory exists")
-    parser.add_argument("--initialize", action='store_true', default=False, help="Initialize the working directory. If it exists, remove it and create an empty one. if not, create an empty one.")
+    parser.add_argument("-f", "--force-create", action='store_true', default=False, help="Force create the working directory. If it exists, remove it and create an empty one. if not, create an empty one.")
     parser.add_argument('-c', '--container', help="docker container name or id, if this is specified, the command would run in the specified container ")
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
-    parser.add_argument("-b", "--backend", type=str, default="plain")
+    parser.add_argument("-b", "--backend", type=str, choices=["plain", "xterm"], default="plain")
     parser.add_argument("--logLevel", type=parse_logLevel, default="ERROR")
     parser.add_argument("--height", type=int, default=10)
-    parser.add_argument("--bg", "--background",
-                            dest="background",
-                            action='store_true',
-                            default=False)
+    mg = parser.add_mutually_exclusive_group()
+    mg.add_argument("-i", 
+                    "--interactive", 
+                    action='store_true', 
+                    default=False, 
+                    help="Execute the command interactively")
+    mg.add_argument("--bg", "--background",
+                        dest="background",
+                        action='store_true',
+                        default=False)
     parser.add_argument("--outfile", "--outFile",
                             dest="outFile",
                             type=str,
                             default=None)
     line = line.strip('\n').strip(' ').lstrip('%%bash')
     if line:
-        args = parser.parse_args(line.split(' '), namespace=BashArgumentNamespace())
+        args = parser.parse_args(line.split(' '), namespace=BashArgsNS())
     else:
-        args = parser.parse_args([], namespace=BashArgumentNamespace())
+        args = parser.parse_args([], namespace=BashArgsNS())
     return args
 
-def _bash(args: BashArgumentNamespace, fs: IFileSystem, cell: str):
+def _bash(args: BashArgsNS, fs: IFileSystem, cell: str):
     global_logger.debug("Current dir: %s", fs.getcwd())
     global_logger.debug(args)
 
     command = preprocessCommand(cell, args)
     _prepare(args, fs, global_logger)
-    executeCmd(command, verbose=args.verbose,
-                        backend=args.backend,
-                        height=args.height,
-                        container=args.container,
-                        background=args.background,
-                        outFile=args.outFile,
-                        fs=fs,
-                        logger=global_logger)
+    executeCmd(command, args, fs=fs, logger=global_logger)
 
 @suppress(Exception)
 def bash(line: str, cell: str):

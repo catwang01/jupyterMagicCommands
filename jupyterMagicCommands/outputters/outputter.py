@@ -31,11 +31,14 @@ class AbstractOutputter:
 
 class NonInteractiveOutputter(AbstractOutputter):
 
-    def register_read_callback(self, cb) -> None:
-        pass
-
     def write(self, s):
         print(s)
 
-    def handle_read(self):
-        pass
+class FileOutputter(AbstractOutputter):
+
+    def __init__(self, file_path: str) -> None:
+        self.file_path = file_path
+        self.file = open(file_path, 'w')
+
+    def write(self, s: str):
+        self.file.write(s)
