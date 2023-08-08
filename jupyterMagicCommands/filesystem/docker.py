@@ -9,6 +9,7 @@ from typing import IO, List, Optional
 
 from docker.models.containers import Container, ExecResult
 
+from jupyterMagicCommands.outputters.interactive_outputter import InteractiveOutputter
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.utils.docker import (copy_from_container,
                                                copy_to_container)
@@ -55,10 +56,11 @@ class DockerFileSystem(IFileSystem):
             fp.write(cmd)
             fp.seek(0)
             self.copy_to_container(fp.name, fp.name)
-            actual_cmd_to_run = f"{self.default_shell} {fp.name}"
+            disable_bracketed_paste = 'echo "set enable-bracketed-paste off" > .inputrc && INPUTRC=$PWD/.inputrc'
+            actual_cmd_to_run = f'bash -c \'{disable_bracketed_paste} {self.default_shell} {fp.name}\''
             if background:
                 if outFile is None:
-                    actual_cmd_to_run += f" &"
+                    actual_cmd_to_run += " &"
                     print("WARNING: outFile is not set, the output of command will be discarded")
                 else:
                     actual_cmd_to_run += f" 1>'{outFile}' 2>&1 &"
@@ -149,6 +151,7 @@ rm -rf '{path}'
 
         sock.setblocking(False)
         sel = selectors.DefaultSelector()
+        outputter = InteractiveOutputter()
 
         def read(key, mask):
             conn = key.fileobj
@@ -163,7 +166,7 @@ rm -rf '{path}'
                 if not data:
                     close_sock()
                     return
-                print(data.decode("utf8"), end="")
+                outputter.write(data.decode("utf8"))
             if mask & selectors.EVENT_WRITE and dataToSend:
                 data = dataToSend.pop(0)
                 conn.send(data)  # Should be ready
@@ -174,10 +177,14 @@ rm -rf '{path}'
         def get_registered_socket_count():
             return len(sel.get_map())
 
+        outputter.register_read_callback(
+            lambda x: data.dataToSend.append((x+'\n').encode('utf8'))
+        )
         shouldContinue = True
         while shouldContinue:
             try:
-                events = sel.select()
+                outputter.handle_read()
+                events = sel.select(timeout=0.01)
                 for key, mask in events:
                     callback = key.data.callback
                     callback(key, mask)

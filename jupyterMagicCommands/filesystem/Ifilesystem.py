@@ -1,7 +1,7 @@
 from typing import IO
-from abc import abstractmethod
+from abc import abstractmethod, ABCMeta
 
-class IFileSystem:
+class IFileSystem(metaclass=ABCMeta):
 
     @abstractmethod
     def exists(self, path: str) -> bool:

@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from logging import ERROR, Logger
 from typing import Optional
 
-import ipywidgets as widgets
 import pexpect
 from IPython.display import display
 
+from jupyterMagicCommands.outputters.async_interactive_outputter import AsyncInteractiveOutputter
 from jupyterMagicCommands.filesystem.filesystem_factory import \
     FileSystemFactory
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
@@ -131,60 +131,6 @@ async def run_command(child, outputter: 'Outputter'):
         except KeyboardInterrupt:
             child.sendintr()
 
-class Outputter:
-
-    def write(self, s) -> None:
-        pass
-
-    def register_read_callback(self, cb) -> None:
-        pass
-
-    async def on_read(self) -> None:
-        pass
-
-from abc import ABCMeta, abstractmethod
-
-
-class AbstractOutputterReadCb(metaclass=ABCMeta):
-
-    @abstractmethod
-    def __call__(self, x) -> None:
-        pass
-
-class EmptyOutputterReadCB(AbstractOutputterReadCb):
-
-    def __call__(self, x) -> None:
-        pass
-
-class InteractiveOutputter(Outputter):
-
-    def __init__(self):
-        self.out = widgets.Output()
-        self.text = widgets.Text(placeholder='input', continuous_update=False)
-        self.read_cb: AbstractOutputterReadCb = EmptyOutputterReadCB()
-        display(widgets.VBox([self.out, self.text]))
-
-    def write(self, s):
-        self.out.append_stdout(s)
-
-    def register_read_callback(self, cb: AbstractOutputterReadCb):
-        self.read_cb = cb
-
-    @staticmethod
-    def wait_for_change(widget, value):
-        future = asyncio.Future()
-        def getvalue(change):
-            # make the new value available
-            future.set_result(change.new)
-            widget.unobserve(getvalue, value)
-        widget.observe(getvalue, value)
-        return future
-
-    async def on_read(self):
-        while True:
-            x = await self.wait_for_change(self.text, 'value')
-            self.read_cb(x)
-
 def interactiveExecuteCommand(command, verbose=False, **kwargs):
     logger = kwargs.get('logger', NULL_LOGGER)
     if verbose:
@@ -196,7 +142,7 @@ def interactiveExecuteCommand(command, verbose=False, **kwargs):
         cmd = f"bash '{fp.name}'"
         logger.debug(cmd)
         child = pexpect.spawn(cmd)
-        outputter = InteractiveOutputter()
+        outputter = AsyncInteractiveOutputter()
         outputter.register_read_callback(child.sendline)
         asyncio.ensure_future(asyncio.gather(outputter.on_read(), run_command(child, outputter)))
 

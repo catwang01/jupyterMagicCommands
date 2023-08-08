@@ -21,6 +21,6 @@ def suppress(*suppress_args, **suppress_kwargs):
             with Suppress(*suppress_args, **suppress_kwargs) as sp:
                 ret =  func(*args, **kwargs)
                 return ret
-            print(sp)
+            print("Run into error: ", sp.exception)
         return suppress_innermost_wrapper
     return suppress_level1_wrapper
