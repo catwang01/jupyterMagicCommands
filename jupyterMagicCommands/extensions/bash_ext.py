@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import tempfile
 import time
 from dataclasses import dataclass
@@ -112,19 +113,8 @@ def xtermExecuteCommand(command, verbose=False, **kwargs):
             except KeyboardInterrupt:
                 child.sendintr()
 
-import asyncio
 
-
-def wait_for_change(widget, value):
-    future = asyncio.Future()
-    def getvalue(change):
-        # make the new value available
-        future.set_result(change.new)
-        widget.unobserve(getvalue, value)
-    widget.observe(getvalue, value)
-    return future
-
-async def run_command(child, out):
+async def run_command(child, outputter: 'Outputter'):
     prevMessage = ""
     while True:
         try:
@@ -134,17 +124,66 @@ async def run_command(child, out):
                 async_=True
             ) # fresh terminal per 0.2s
             message = child.before.decode()
-            out.append_stdout(message[len(prevMessage):])
+            outputter.write(message[len(prevMessage):])
             prevMessage = message
             if i != 0:
                 break
         except KeyboardInterrupt:
             child.sendintr()
 
-async def on_submit(child, widget, out):
-    while True:
-        x = await wait_for_change(widget, 'value')
-        child.sendline(x)
+class Outputter:
+
+    def write(self, s) -> None:
+        pass
+
+    def register_read_callback(self, cb) -> None:
+        pass
+
+    async def on_read(self) -> None:
+        pass
+
+from abc import ABCMeta, abstractmethod
+
+
+class AbstractOutputterReadCb(metaclass=ABCMeta):
+
+    @abstractmethod
+    def __call__(self, x) -> None:
+        pass
+
+class EmptyOutputterReadCB(AbstractOutputterReadCb):
+
+    def __call__(self, x) -> None:
+        pass
+
+class InteractiveOutputter(Outputter):
+
+    def __init__(self):
+        self.out = widgets.Output()
+        self.text = widgets.Text(placeholder='input', continuous_update=False)
+        self.read_cb: AbstractOutputterReadCb = EmptyOutputterReadCB()
+        display(widgets.VBox([self.out, self.text]))
+
+    def write(self, s):
+        self.out.append_stdout(s)
+
+    def register_read_callback(self, cb: AbstractOutputterReadCb):
+        self.read_cb = cb
+
+    @staticmethod
+    def wait_for_change(widget, value):
+        future = asyncio.Future()
+        def getvalue(change):
+            # make the new value available
+            future.set_result(change.new)
+            widget.unobserve(getvalue, value)
+        widget.observe(getvalue, value)
+        return future
+
+    async def on_read(self):
+        while True:
+            x = await self.wait_for_change(self.text, 'value')
+            self.read_cb(x)
 
 def interactiveExecuteCommand(command, verbose=False, **kwargs):
     logger = kwargs.get('logger', NULL_LOGGER)
@@ -157,10 +196,9 @@ def interactiveExecuteCommand(command, verbose=False, **kwargs):
         cmd = f"bash '{fp.name}'"
         logger.debug(cmd)
         child = pexpect.spawn(cmd)
-        out = widgets.Output()
-        text = widgets.Text(placeholder='input', continuous_update=False)
-        display(widgets.VBox([out, text]))
-        asyncio.ensure_future(asyncio.gather(on_submit(child, text, out), run_command(child, out)))
+        outputter = InteractiveOutputter()
+        outputter.register_read_callback(child.sendline)
+        asyncio.ensure_future(asyncio.gather(outputter.on_read(), run_command(child, outputter)))
 
 def executeCmd(*args, backend="plain", **kwargs):
     if backend == "plain":
