@@ -1,19 +1,20 @@
 import argparse
-import ipywidgets as widgets
 import tempfile
 import time
 from dataclasses import dataclass
 from logging import ERROR, Logger
 from typing import Optional
 
+import ipywidgets as widgets
 import pexpect
 from IPython.display import display
-from jupyterMagicCommands.utils.parser import parse_logLevel
 
 from jupyterMagicCommands.filesystem.filesystem_factory import \
     FileSystemFactory
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
+from jupyterMagicCommands.utils.functools import suppress
 from jupyterMagicCommands.utils.log import NULL_LOGGER, getLogger
+from jupyterMagicCommands.utils.parser import parse_logLevel
 
 global_logger = getLogger(__name__)
 
@@ -112,6 +113,7 @@ def xtermExecuteCommand(command, verbose=False, **kwargs):
                 child.sendintr()
 
 import asyncio
+
 
 def wait_for_change(widget, value):
     future = asyncio.Future()
@@ -232,16 +234,14 @@ def _bash(args: BashArgumentNamespace, fs: IFileSystem, cell: str):
                         fs=fs,
                         logger=global_logger)
 
+@suppress(Exception)
 def bash(line: str, cell: str):
     args = get_args(line)
     global_logger.setLevel(args.logLevel)
     fs = FileSystemFactory.get_filesystem(args.container)
     olddir = fs.getcwd()
     try:
-        print("hello")
         _bash(args, fs, cell)
-    except Exception as e:
-        print(e)
     finally:
         fs.chdir(olddir)
 
