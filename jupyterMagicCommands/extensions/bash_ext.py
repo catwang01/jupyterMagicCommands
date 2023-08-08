@@ -127,8 +127,8 @@ async def run_command(child, out):
     while True:
         try:
             i = await child.expect_list(
-                [pexpect.TIMEOUT, pexpect.EOF], 
-                timeout=0.2, 
+                [pexpect.TIMEOUT, pexpect.EOF],
+                timeout=0.2,
                 async_=True
             ) # fresh terminal per 0.2s
             message = child.before.decode()

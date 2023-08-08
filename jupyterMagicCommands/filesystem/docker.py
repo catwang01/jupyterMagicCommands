@@ -27,14 +27,14 @@ class DockerFileSystem(IFileSystem):
         self._default_shell: Optional[str] = None
         self._default_shell_checked: bool = False
         self.logger = logger
-        
+
     @property
     def default_shell(self) -> Optional[str]:
         if self._default_shell is None and not self._default_shell_checked:
             self._default_shell = self._detect_default_shells()
             self._default_shell_checked = True
         return self._default_shell
-    
+
     def _detect_default_shells(self, detect_list: List[str]=SHELL_DETECT_LIST) -> Optional[str]:
         for shell in detect_list:
             results = self.container.exec_run(shell, workdir=self._workdir)
@@ -48,8 +48,8 @@ class DockerFileSystem(IFileSystem):
     def copy_from_container(self, src: str, dst: str):
         copy_from_container(self.container, src, dst)
 
-    def _execute_cmd(self, cmd: str, 
-                            background: bool=False, 
+    def _execute_cmd(self, cmd: str,
+                            background: bool=False,
                             outFile: Optional[str]=None, **kwargs) -> ExecResult:
         with tempfile.NamedTemporaryFile(mode="w+") as fp:
             fp.write(cmd)
@@ -70,7 +70,7 @@ class DockerFileSystem(IFileSystem):
 
     def exists(self, path: str) -> bool:
         template = f"""
-if [ -e '{path}' ]; then 
+if [ -e '{path}' ]; then
     echo "Exists"
 else
     echo "Doesn't exist"
@@ -131,8 +131,8 @@ rm -rf '{path}'
         if results.exit_code != 0:
             raise Exception(output)
 
-    def system(self, cmd: str, 
-                background: bool=False, 
+    def system(self, cmd: str,
+                background: bool=False,
                 outFile: Optional[str]=None) -> None:
         if background:
             results = self._execute_cmd(cmd, background=background, outFile=outFile, detach=True)
@@ -190,7 +190,7 @@ rm -rf '{path}'
         def __init__(self, docker: 'DockerFileSystem', file: IO, path: str):
             self.docker = docker
             self.file = file
-            self.path = path 
+            self.path = path
 
         def __getattr__(self, name):
             # Attribute lookups are delegated to the underlying file
