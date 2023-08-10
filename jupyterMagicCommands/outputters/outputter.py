@@ -32,7 +32,7 @@ class AbstractOutputter:
 class NonInteractiveOutputter(AbstractOutputter):
 
     def write(self, s):
-        print(s)
+        print(s, end="")
 
 class FileOutputter(AbstractOutputter):
 
