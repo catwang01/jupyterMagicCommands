@@ -1,12 +1,12 @@
 import asyncio
 import logging
+import threading
 import os
 import subprocess
 import tempfile
 from typing import IO, Optional
 
 import pexpect
-from IPython import get_ipython
 
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.outputters import (AbstractOutputter,
@@ -61,6 +61,8 @@ class FileSystem(IFileSystem):
                         break
                 except KeyboardInterrupt:
                     child.sendintr()
+                except Exception:
+                    break
 
         encoding = 'utf8'
         with tempfile.NamedTemporaryFile(encoding=encoding, mode='w', delete=False) as fp:
@@ -69,7 +71,7 @@ class FileSystem(IFileSystem):
             logger.debug(actual_cmd_to_run)
 
         if background:
-            if outFile is None: 
+            if outFile is None:
                 outFile = '/tmp/out.log'
             print(f"WARNING: outFile is not set, the default output file is {outFile}")
             with open(outFile, 'w', encoding='utf8') as logFile:
@@ -93,5 +95,17 @@ class FileSystem(IFileSystem):
             else:
                 outputter = NonInteractiveOutputter()
         outputter.register_read_callback(child.sendline)
-        gathered = asyncio.gather(outputter.on_read(), run_command(child, outputter))
-        asyncio.ensure_future(gathered)
+
+        def task():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            gathered = asyncio.gather(outputter.on_read(), run_command(child, outputter))
+            loop.run_until_complete(gathered)
+
+        t = threading.Thread(target=task)
+        t.start()
+        try:
+            t.join()
+        except (Exception, KeyboardInterrupt) as e:
+            child.close()
+            raise e

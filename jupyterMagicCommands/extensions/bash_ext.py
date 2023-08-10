@@ -1,10 +1,10 @@
 import argparse
-from operator import itemgetter
-import asyncio
+import os
 import tempfile
 import time
 from dataclasses import dataclass
 from logging import ERROR, Logger
+from operator import itemgetter
 from typing import Optional
 
 import pexpect
@@ -190,6 +190,7 @@ def _bash(args: BashArgsNS, fs: IFileSystem, cell: str):
     _prepare(args, fs, global_logger)
     executeCmd(command, args, fs=fs, logger=global_logger)
 
+@suppress(KeyboardInterrupt, onerror=lambda sp: print(f"{os.linesep}KeyboardInteruptted ^C"))
 @suppress(Exception)
 def bash(line: str, cell: str):
     args = get_args(line)

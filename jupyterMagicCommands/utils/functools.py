@@ -14,13 +14,15 @@ class Suppress:
         self.traceback = exc_tb
         return exc_type is not None and issubclass(exc_type, self._exception_classes)
 
-def suppress(*suppress_args, **suppress_kwargs):
+_DEFAULT_ONERROR = lambda sp: print("Run into error: ", sp.exception)
+
+def suppress(*suppress_args, onerror=_DEFAULT_ONERROR, **suppress_kwargs):
     def suppress_level1_wrapper(func):
         @wraps(func)
         def suppress_innermost_wrapper(*args, **kwargs):
             with Suppress(*suppress_args, **suppress_kwargs) as sp:
                 ret =  func(*args, **kwargs)
                 return ret
-            print("Run into error: ", sp.exception)
+            onerror(sp)
         return suppress_innermost_wrapper
     return suppress_level1_wrapper
