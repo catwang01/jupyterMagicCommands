@@ -60,4 +60,4 @@ def drawio(line):
     _drawio_image(args.page, display_options)
 
 def load_ipython_extension(ipython):
-    ipython.register_magic_function(openai_magic, 'line')
+    ipython.register_magic_function(drawio, 'line')
