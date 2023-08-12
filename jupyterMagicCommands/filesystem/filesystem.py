@@ -1,15 +1,21 @@
+import asyncio
 import logging
+import threading
 import os
 import subprocess
 import tempfile
 from typing import IO, Optional
 
-from IPython import get_ipython
+import pexpect
 
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
-from jupyterMagicCommands.mixins.logmixin import LogMixin
+from jupyterMagicCommands.outputters import (AbstractOutputter,
+                                             AsyncInteractiveOutputter,
+                                             FileOutputter,
+                                             NonInteractiveOutputter)
 from jupyterMagicCommands.utils.log import NULL_LOGGER
 
+logger = logging.getLogger(__name__)
 
 class FileSystem(IFileSystem):
 
@@ -34,23 +40,72 @@ class FileSystem(IFileSystem):
     def removedirs(self, path: str) -> None:
         return os.removedirs(path)
 
-    def system(self, cmd: str, background: bool=False, outFile: Optional[str]=None) -> None:
+    def system(self, cmd: str, 
+               background: bool=False, 
+               interactive: bool=False,
+               outFile: Optional[str]=None) -> None:
+
+        async def run_command(child, outputter: AbstractOutputter):
+            prevMessage = ""
+            while True:
+                try:
+                    i = await child.expect_list(
+                        [pexpect.TIMEOUT, pexpect.EOF],
+                        timeout=0.02,
+                        async_=True
+                    ) # fresh terminal per 0.2s
+                    message = child.before.decode()
+                    outputter.write(message[len(prevMessage):])
+                    prevMessage = message
+                    if i != 0:
+                        break
+                except KeyboardInterrupt:
+                    child.sendintr()
+                except Exception:
+                    break
+
         encoding = 'utf8'
         with tempfile.NamedTemporaryFile(encoding=encoding, mode='w', delete=False) as fp:
             fp.write(cmd)
-            fp.seek(0)
             actual_cmd_to_run = f"bash '{fp.name}'"
-            if background:
-                if outFile is None: outFile = 'out.log'
-                print(f"WARNING: outFile is not set, the default output file is {outFile}")
-                with open(outFile, 'w', encoding='utf8') as logFile:
-                    stdout = stderr = logFile
-                    process = subprocess.Popen(
-                        actual_cmd_to_run,
-                        stdout=stdout,
-                        stderr=stderr,
-                        shell=True
-                    )
-                print(f"Run subprocess with pid: {process.pid}. Output to '{outFile}'")
+            logger.debug(actual_cmd_to_run)
+
+        if background:
+            if outFile is None:
+                outFile = '/tmp/out.log'
+            print(f"WARNING: outFile is not set, the default output file is {outFile}")
+            with open(outFile, 'w', encoding='utf8') as logFile:
+                stdout = stderr = logFile
+                process = subprocess.Popen(
+                    actual_cmd_to_run,
+                    stdout=stdout,
+                    stderr=stderr,
+                    shell=True
+                )
+            print(f"Run subprocess with pid: {process.pid}. Output to '{outFile}'")
+            return
+
+        child = pexpect.spawn(actual_cmd_to_run)
+        outputter: AbstractOutputter
+        if interactive:
+            outputter = AsyncInteractiveOutputter()
+        else:
+            if outFile is not None:
+                outputter = FileOutputter(outFile)
             else:
-                get_ipython().system(actual_cmd_to_run)
+                outputter = NonInteractiveOutputter()
+        outputter.register_read_callback(child.sendline)
+
+        def task():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            gathered = asyncio.gather(outputter.on_read(), run_command(child, outputter))
+            loop.run_until_complete(gathered)
+
+        t = threading.Thread(target=task)
+        t.start()
+        try:
+            t.join()
+        except (Exception, KeyboardInterrupt) as e:
+            child.close()
+            raise e

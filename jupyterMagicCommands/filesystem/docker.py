@@ -9,6 +9,7 @@ from typing import IO, List, Optional
 
 from docker.models.containers import Container, ExecResult
 
+from jupyterMagicCommands.outputters import InteractiveOutputter, NonInteractiveOutputter, AbstractOutputter
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.utils.docker import (copy_from_container,
                                                copy_to_container)
@@ -27,14 +28,14 @@ class DockerFileSystem(IFileSystem):
         self._default_shell: Optional[str] = None
         self._default_shell_checked: bool = False
         self.logger = logger
-        
+
     @property
     def default_shell(self) -> Optional[str]:
         if self._default_shell is None and not self._default_shell_checked:
             self._default_shell = self._detect_default_shells()
             self._default_shell_checked = True
         return self._default_shell
-    
+
     def _detect_default_shells(self, detect_list: List[str]=SHELL_DETECT_LIST) -> Optional[str]:
         for shell in detect_list:
             results = self.container.exec_run(shell, workdir=self._workdir)
@@ -48,17 +49,18 @@ class DockerFileSystem(IFileSystem):
     def copy_from_container(self, src: str, dst: str):
         copy_from_container(self.container, src, dst)
 
-    def _execute_cmd(self, cmd: str, 
-                            background: bool=False, 
+    def _execute_cmd(self, cmd: str,
+                            background: bool=False,
                             outFile: Optional[str]=None, **kwargs) -> ExecResult:
         with tempfile.NamedTemporaryFile(mode="w+") as fp:
             fp.write(cmd)
             fp.seek(0)
             self.copy_to_container(fp.name, fp.name)
-            actual_cmd_to_run = f"{self.default_shell} {fp.name}"
+            disable_bracketed_paste = 'echo "set enable-bracketed-paste off" > .inputrc && INPUTRC=$PWD/.inputrc'
+            actual_cmd_to_run = f'bash -c \'{disable_bracketed_paste} {self.default_shell} {fp.name}\''
             if background:
                 if outFile is None:
-                    actual_cmd_to_run += f" &"
+                    actual_cmd_to_run += " &"
                     print("WARNING: outFile is not set, the output of command will be discarded")
                 else:
                     actual_cmd_to_run += f" 1>'{outFile}' 2>&1 &"
@@ -70,7 +72,7 @@ class DockerFileSystem(IFileSystem):
 
     def exists(self, path: str) -> bool:
         template = f"""
-if [ -e '{path}' ]; then 
+if [ -e '{path}' ]; then
     echo "Exists"
 else
     echo "Doesn't exist"
@@ -131,8 +133,9 @@ rm -rf '{path}'
         if results.exit_code != 0:
             raise Exception(output)
 
-    def system(self, cmd: str, 
-                background: bool=False, 
+    def system(self, cmd: str,
+                background: bool=False,
+                interactive: bool=False,
                 outFile: Optional[str]=None) -> None:
         if background:
             results = self._execute_cmd(cmd, background=background, outFile=outFile, detach=True)
@@ -142,9 +145,10 @@ rm -rf '{path}'
             results = self._execute_cmd(cmd, stdin=True, tty=True, socket=True)
             if results.exit_code is not None and results.exit_code != 0:
                 raise Exception(results)
-            self._handle_socket(results)
+            outputter = InteractiveOutputter() if interactive else NonInteractiveOutputter()
+            self._handle_socket(results, outputter)
 
-    def _handle_socket(self, results: ExecResult) -> None:
+    def _handle_socket(self, results: ExecResult, outputter: AbstractOutputter) -> None:
         sock = results.output._sock
 
         sock.setblocking(False)
@@ -163,7 +167,7 @@ rm -rf '{path}'
                 if not data:
                     close_sock()
                     return
-                print(data.decode("utf8"), end="")
+                outputter.write(data.decode("utf8"))
             if mask & selectors.EVENT_WRITE and dataToSend:
                 data = dataToSend.pop(0)
                 conn.send(data)  # Should be ready
@@ -174,10 +178,14 @@ rm -rf '{path}'
         def get_registered_socket_count():
             return len(sel.get_map())
 
+        outputter.register_read_callback(
+            lambda x: data.dataToSend.append((x+'\n').encode('utf8'))
+        )
         shouldContinue = True
         while shouldContinue:
             try:
-                events = sel.select()
+                outputter.handle_read()
+                events = sel.select(timeout=0.01)
                 for key, mask in events:
                     callback = key.data.callback
                     callback(key, mask)
@@ -190,7 +198,7 @@ rm -rf '{path}'
         def __init__(self, docker: 'DockerFileSystem', file: IO, path: str):
             self.docker = docker
             self.file = file
-            self.path = path 
+            self.path = path
 
         def __getattr__(self, name):
             # Attribute lookups are delegated to the underlying file
