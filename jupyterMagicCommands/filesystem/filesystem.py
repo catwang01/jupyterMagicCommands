@@ -96,6 +96,7 @@ class FileSystem(IFileSystem):
             else:
                 outputter = NonInteractiveOutputter()
 
+
         outputter.register_read_callback(child.send)
         run_command(child, outputter)
 
