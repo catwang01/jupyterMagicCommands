@@ -25,10 +25,6 @@ class AbstractOutputter:
         pass
 
 
-    async def on_read(self) -> None:
-        pass
-
-
 class NonInteractiveOutputter(AbstractOutputter):
 
     def write(self, s):

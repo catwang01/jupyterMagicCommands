@@ -25,4 +25,4 @@ class InteractiveOutputter(AbstractOutputter):
         self.out.append_stdout(s)
 
     def handle_read(self):
-        self.poll(10)
+        self.poll(10000)

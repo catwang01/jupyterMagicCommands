@@ -1,3 +1,4 @@
+import time
 import asyncio
 import logging
 import threading
@@ -10,8 +11,8 @@ import pexpect
 
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.outputters import (AbstractOutputter,
-                                             AsyncInteractiveOutputter,
                                              FileOutputter,
+                                             InteractiveOutputter,
                                              NonInteractiveOutputter)
 from jupyterMagicCommands.utils.log import NULL_LOGGER
 
@@ -45,17 +46,17 @@ class FileSystem(IFileSystem):
                interactive: bool=False,
                outFile: Optional[str]=None) -> None:
 
-        async def run_command(child, outputter: AbstractOutputter):
+        def run_command(child, outputter: AbstractOutputter):
             prevMessage = ""
             while True:
                 try:
-                    i = await child.expect_list(
+                    i = child.expect_list(
                         [pexpect.TIMEOUT, pexpect.EOF],
-                        timeout=0.02,
-                        async_=True
+                        timeout=0.01,
                     ) # fresh terminal per 0.2s
                     message = child.before.decode()
                     outputter.write(message[len(prevMessage):])
+                    outputter.handle_read()
                     prevMessage = message
                     if i != 0:
                         break
@@ -88,24 +89,21 @@ class FileSystem(IFileSystem):
         child = pexpect.spawn(actual_cmd_to_run)
         outputter: AbstractOutputter
         if interactive:
-            outputter = AsyncInteractiveOutputter()
+            outputter = InteractiveOutputter()
         else:
             if outFile is not None:
                 outputter = FileOutputter(outFile)
             else:
                 outputter = NonInteractiveOutputter()
-        outputter.register_read_callback(child.sendline)
 
-        def task():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            gathered = asyncio.gather(outputter.on_read(), run_command(child, outputter))
-            loop.run_until_complete(gathered)
+        def a(x):
+            print("submitted: ", x)
+            child.sendline(x)
+        outputter.register_read_callback(a)
+        run_command(child, outputter)
 
-        t = threading.Thread(target=task)
-        t.start()
-        try:
-            t.join()
-        except (Exception, KeyboardInterrupt) as e:
-            child.close()
-            raise e
+        # loop = asyncio.new_event_loop()
+        # asyncio.set_event_loop(loop)
+        # gathered = asyncio.gather(outputter.on_read(), run_command(child, outputter))
+        # asyncio.ensure_future(gathered)
+        # loop.run_until_complete(gathered)
