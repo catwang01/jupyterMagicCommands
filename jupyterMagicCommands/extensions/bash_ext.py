@@ -13,8 +13,6 @@ from IPython.display import display
 from jupyterMagicCommands.filesystem.filesystem_factory import \
     FileSystemFactory
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
-from jupyterMagicCommands.outputters.async_interactive_outputter import \
-    AsyncInteractiveOutputter
 from jupyterMagicCommands.utils.functools import suppress
 from jupyterMagicCommands.utils.log import NULL_LOGGER, getLogger
 from jupyterMagicCommands.utils.parser import parse_logLevel
