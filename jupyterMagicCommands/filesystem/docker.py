@@ -179,7 +179,7 @@ rm -rf '{path}'
             return len(sel.get_map())
 
         outputter.register_read_callback(
-            lambda x: data.dataToSend.append((x+'\n').encode('utf8'))
+            lambda x: data.dataToSend.append(x.encode('utf8'))
         )
         shouldContinue = True
         while shouldContinue:

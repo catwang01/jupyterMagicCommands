@@ -96,10 +96,8 @@ class FileSystem(IFileSystem):
             else:
                 outputter = NonInteractiveOutputter()
 
-        def a(x):
-            print("submitted: ", x)
-            child.sendline(x)
-        outputter.register_read_callback(a)
+
+        outputter.register_read_callback(child.send)
         run_command(child, outputter)
 
         # loop = asyncio.new_event_loop()
