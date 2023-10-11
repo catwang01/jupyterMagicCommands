@@ -9,8 +9,10 @@ from typing import IO, List, Optional
 
 from docker.models.containers import Container, ExecResult
 
-from jupyterMagicCommands.outputters import InteractiveOutputter, NonInteractiveOutputter, AbstractOutputter
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
+from jupyterMagicCommands.outputters import (AbstractOutputter,
+                                             InteractiveOutputter,
+                                             NonInteractiveOutputter)
 from jupyterMagicCommands.utils.docker import (copy_from_container,
                                                copy_to_container)
 from jupyterMagicCommands.utils.log import NULL_LOGGER

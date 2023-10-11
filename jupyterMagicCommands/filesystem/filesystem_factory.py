@@ -21,4 +21,3 @@ class FileSystemFactory:
         else:
             fs = FileSystem(logger)
         return fs
-

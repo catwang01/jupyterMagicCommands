@@ -1,8 +1,6 @@
-import time
-import asyncio
 import logging
-import threading
 import os
+import shutil
 import subprocess
 import tempfile
 from typing import IO, Optional
@@ -10,8 +8,7 @@ from typing import IO, Optional
 import pexpect
 
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
-from jupyterMagicCommands.outputters import (AbstractOutputter,
-                                             FileOutputter,
+from jupyterMagicCommands.outputters import (AbstractOutputter, FileOutputter,
                                              InteractiveOutputter,
                                              NonInteractiveOutputter)
 from jupyterMagicCommands.utils.log import NULL_LOGGER
@@ -36,13 +33,13 @@ class FileSystem(IFileSystem):
         return os.getcwd()
 
     def chdir(self, path:str) -> None:
-        return os.chdir(path)
+        os.chdir(path)
 
     def removedirs(self, path: str) -> None:
-        return os.removedirs(path)
+        shutil.rmtree(path)
 
-    def system(self, cmd: str, 
-               background: bool=False, 
+    def system(self, cmd: str,
+               background: bool=False,
                interactive: bool=False,
                outFile: Optional[str]=None) -> None:
 

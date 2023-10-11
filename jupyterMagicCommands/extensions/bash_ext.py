@@ -74,7 +74,7 @@ def sendToTerminal(termName, displayHandler, message, prevMessage=None):
 
 def plainExecuteCommand(command: str, args: BashArgsNS, **kwargs):
     logger = kwargs.get('logger', NULL_LOGGER)
-    
+
     verbose, background, interactive, outFile = itemgetter('verbose', 'background', 'interactive', 'outFile')(vars(args))
     logger.debug('### Parameters starts ###')
     logger.debug(f"command: '{command}'")
@@ -152,27 +152,33 @@ def _prepare(args: BashArgsNS, fs: IFileSystem, logger: Logger) -> None:
 def get_args(line: str) -> BashArgsNS:
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--d", "--cwd", dest="cwd", type=str, default=".", help="Working directory")
-    parser.add_argument("--create", action='store_true', default=False, help="Create the working directory if not existing. Do nothing if the directory exists")
-    parser.add_argument("-f", "--force-create", action='store_true', default=False, help="Force create the working directory. If it exists, remove it and create an empty one. if not, create an empty one.")
-    parser.add_argument('-c', '--container', help="docker container name or id, if this is specified, the command would run in the specified container ")
+    parser.add_argument("--create",
+                        action='store_true',
+                        default=False,
+                        help="Create the working directory if not existing. Do nothing if the directory exists")
+    parser.add_argument("-f", "--force-create",
+                        action='store_true',
+                        default=False,
+                        help="Force create the working directory. If it exists, remove it and create an empty one. if not, create an empty one.")
+    parser.add_argument('-c', '--container',
+                        help="docker container name or id, if this is specified, the command would run in the specified container ")
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
     parser.add_argument("-b", "--backend", type=str, choices=["plain", "xterm"], default="plain")
     parser.add_argument("--logLevel", type=parse_logLevel, default="ERROR")
     parser.add_argument("--height", type=int, default=10)
     mg = parser.add_mutually_exclusive_group()
-    mg.add_argument("-i", 
-                    "--interactive", 
-                    action='store_true', 
-                    default=False, 
+    mg.add_argument("-i", "--interactive",
+                    action='store_true',
+                    default=False,
                     help="Execute the command interactively")
     mg.add_argument("--bg", "--background",
-                        dest="background",
-                        action='store_true',
-                        default=False)
+                    dest="background",
+                    action='store_true',
+                    default=False)
     parser.add_argument("--outfile", "--outFile",
-                            dest="outFile",
-                            type=str,
-                            default=None)
+                        dest="outFile",
+                        type=str,
+                        default=None)
     line = line.strip('\n').strip(' ').lstrip('%%bash')
     if line:
         args = parser.parse_args(line.split(' '), namespace=BashArgsNS())
