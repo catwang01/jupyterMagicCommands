@@ -58,7 +58,7 @@ class DockerFileSystem(IFileSystem):
             fp.write(cmd)
             fp.seek(0)
             self.copy_to_container(fp.name, fp.name)
-            disable_bracketed_paste = 'echo "set enable-bracketed-paste off" > .inputrc && INPUTRC=$PWD/.inputrc'
+            disable_bracketed_paste = 'cd /tmp && echo "set enable-bracketed-paste off" > .inputrc && INPUTRC=$PWD/.inputrc'
             actual_cmd_to_run = f'bash -c \'{disable_bracketed_paste} {self.default_shell} {fp.name}\''
             if background:
                 if outFile is None:
