@@ -58,14 +58,14 @@ class DockerFileSystem(IFileSystem):
             fp.write(cmd)
             fp.seek(0)
             self.copy_to_container(fp.name, fp.name)
-            disable_bracketed_paste = 'cd /tmp && echo "set enable-bracketed-paste off" > .inputrc && INPUTRC=$PWD/.inputrc'
-            actual_cmd_to_run = f'bash -c \'{disable_bracketed_paste} {self.default_shell} {fp.name}\''
+            disable_bracketed_paste = 'echo "set enable-bracketed-paste off" > .inputrc && INPUTRC=$PWD/.inputrc'
+            actual_cmd_to_run = f'{disable_bracketed_paste} {self.default_shell} {fp.name}'
             if background:
                 if outFile is None:
-                    actual_cmd_to_run += " &"
-                    print("WARNING: outFile is not set, the output of command will be discarded")
-                else:
-                    actual_cmd_to_run += f" 1>'{outFile}' 2>&1 &"
+                    outFile = "/tmp/out.log"
+                    print(f"WARNING: outFile is not set, the output of command will written into {outFile} by default")
+                actual_cmd_to_run += f" 1>'{outFile}' 2>&1 &"
+            actual_cmd_to_run = f"bash -c \'{actual_cmd_to_run}\'"
             self.logger.info("actual command to run: %s", actual_cmd_to_run)
             results = self.container.exec_run(actual_cmd_to_run,
                                               workdir=self._workdir,
