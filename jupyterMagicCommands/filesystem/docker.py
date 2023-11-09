@@ -69,6 +69,7 @@ class DockerFileSystem(IFileSystem):
             self.logger.debug("actual command to run: %s", actual_cmd_to_run)
             results = self.container.exec_run(actual_cmd_to_run,
                                               workdir=self._workdir,
+                                              user="root",
                                               **kwargs)
         return results
 
