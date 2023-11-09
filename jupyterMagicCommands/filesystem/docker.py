@@ -66,7 +66,7 @@ class DockerFileSystem(IFileSystem):
                     print("WARNING: outFile is not set, the output of command will be discarded")
                 else:
                     actual_cmd_to_run += f" 1>'{outFile}' 2>&1 &"
-            self.logger.debug("actual command to run: %s", actual_cmd_to_run)
+            self.logger.info("actual command to run: %s", actual_cmd_to_run)
             results = self.container.exec_run(actual_cmd_to_run,
                                               workdir=self._workdir,
                                               user="root",
