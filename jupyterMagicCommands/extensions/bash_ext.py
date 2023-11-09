@@ -199,7 +199,7 @@ def _bash(args: BashArgsNS, fs: IFileSystem, cell: str):
 def bash(line: str, cell: str):
     args = get_args(line)
     global_logger.setLevel(args.logLevel)
-    fs = FileSystemFactory.get_filesystem(args.container)
+    fs = FileSystemFactory.get_filesystem(args.container, global_logger)
     olddir = fs.getcwd()
     try:
         _bash(args, fs, cell)
