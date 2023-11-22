@@ -16,6 +16,9 @@ from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.utils.functools import suppress
 from jupyterMagicCommands.utils.log import NULL_LOGGER, getLogger
 from jupyterMagicCommands.utils.parser import parse_logLevel
+from jupyterMagicCommands.extensions.constants import \
+        EMPTY_CONTAINER_NAME, \
+        JUPYTER_MAGIC_COMMAND_BASH_CURRENT_CONTAINER
 
 global_logger = getLogger(__name__)
 
@@ -161,7 +164,13 @@ def get_args(line: str) -> BashArgsNS:
                         default=False,
                         help="Force create the working directory. If it exists, remove it and create an empty one. if not, create an empty one.")
     parser.add_argument('-c', '--container',
-                        help="docker container name or id, if this is specified, the command would run in the specified container ")
+                        help="docker container name or id, if this is specified, the command would run in the specified container",
+                        nargs="?",
+                        const=os.environ.get(
+                                JUPYTER_MAGIC_COMMAND_BASH_CURRENT_CONTAINER, 
+                                EMPTY_CONTAINER_NAME
+                            )
+                        )
     parser.add_argument("-v", "--verbose", action='store_true', default=False)
     parser.add_argument("-b", "--backend", type=str, choices=["plain", "xterm"], default="plain")
     parser.add_argument("--logLevel", type=parse_logLevel, default="ERROR")
@@ -184,6 +193,9 @@ def get_args(line: str) -> BashArgsNS:
         args = parser.parse_args(line.split(' '), namespace=BashArgsNS())
     else:
         args = parser.parse_args([], namespace=BashArgsNS())
+    if args.container == EMPTY_CONTAINER_NAME:
+        global_logger.error("Trying to use an existing docker but no previously used docker container exists. Use `bash -c <container>` first")
+        exit(-1)
     return args
 
 def _bash(args: BashArgsNS, fs: IFileSystem, cell: str):
@@ -200,6 +212,8 @@ def bash(line: str, cell: str):
     args = get_args(line)
     global_logger.setLevel(args.logLevel)
     fs = FileSystemFactory.get_filesystem(args.container, global_logger)
+    if fs is None:
+        return
     olddir = fs.getcwd()
     try:
         _bash(args, fs, cell)
