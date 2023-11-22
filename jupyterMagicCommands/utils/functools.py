@@ -22,7 +22,10 @@ def suppress(*suppress_args, onerror=_DEFAULT_ONERROR, **suppress_kwargs):
         def suppress_innermost_wrapper(*args, **kwargs):
             with Suppress(*suppress_args, **suppress_kwargs) as sp:
                 ret =  func(*args, **kwargs)
+            if sp.exception is not None:
+                onerror(sp)
+                return
+            else:
                 return ret
-            onerror(sp)
         return suppress_innermost_wrapper
     return suppress_level1_wrapper
