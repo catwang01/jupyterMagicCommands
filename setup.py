@@ -10,6 +10,7 @@ setuptools.setup(
     python_requires=">=3.6",
     install_requires=['ipython', 
                     'plantuml', 
+                    'jupyter_ui_poll',
                     'pandas', 
                     'requests', 
                     "pytest",
