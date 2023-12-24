@@ -63,7 +63,7 @@ class DockerFileSystem(IFileSystem):
             self.logger.debug("Saved")
             self.copy_to_container(filename, filename)
             self.logger.debug("Copying tmp files from %s into container file %s", filename, filename)
-            disable_bracketed_paste = 'echo "set enable-bracketed-paste off" > .inputrc && INPUTRC=$PWD/.inputrc'
+            disable_bracketed_paste = '/bin/echo "set enable-bracketed-paste off" > .inputrc && INPUTRC=$PWD/.inputrc'
             actual_cmd_to_run = f'{disable_bracketed_paste} {self.default_shell} {filename}'
             if background:
                 if outFile is None:

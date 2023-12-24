@@ -10,17 +10,26 @@ def client():
     client = docker.from_env()
     return client
 
-@pytest.fixture(scope="class", params=[("bash", "bash-test"), ("docker:dind", "dind-test")])
+@pytest.fixture(scope="class", params=[
+    ("bash", "bash-test"), 
+    ("ubuntu", "ubuntu-test"), 
+    ("docker:dind", "dind-test")
+])
 def container(client, request):
     imageName, containerName = request.param
     try:
         newContainer = client.containers.get(containerName)
     except docker.errors.NotFound:
         newContainer = client.containers.run(
-            imageName, name=containerName, stdin_open=True, detach=True, remove=True, privileged=True
+            imageName,
+            name=containerName,
+            stdin_open=True,
+            remove=True,
+            detach=True,
+            privileged=True
         )
     yield newContainer
-    newContainer.stop()
+    # newContainer.stop()
 
 
 @pytest.fixture
