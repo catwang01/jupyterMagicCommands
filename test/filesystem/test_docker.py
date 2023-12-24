@@ -17,7 +17,7 @@ def container(client, request):
         newContainer = client.containers.get(containerName)
     except docker.errors.NotFound:
         newContainer = client.containers.run(
-            imageName, name=containerName, stdin_open=True, detach=True, remove=True
+            imageName, name=containerName, stdin_open=True, detach=True, remove=True, privileged=True
         )
     yield newContainer
     newContainer.stop()
@@ -106,3 +106,10 @@ class TestDockerFileSystem:
         with dockerfilesystem.open(path, "r", encoding="utf8") as f:
             s = f.read()
         assert s == "hello world"
+
+    def test_copy_to_container(self, tmp_path, dockerfilesystem):
+        p = str(tmp_path / 'test.txt')
+        with open(p, 'w', encoding='utf8') as f:
+            f.write("hello world")
+        dockerfilesystem.copy_to_container(p, p)
+        assert dockerfilesystem.exists(p)
