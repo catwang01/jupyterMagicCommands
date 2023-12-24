@@ -8,7 +8,7 @@ setuptools.setup(
     author_email="edwardelricwzx@example.com",
     description="Some useful magic commands for juypter",
     packages=setuptools.find_packages(),
-    python_requires=">=3.6",
+    python_requires=">=3.8",
     install_requires=[
         "ipython",
         "plantuml",
@@ -19,5 +19,6 @@ setuptools.setup(
         "docker",
         "openai",
         "ipydrawio[all]",
+        "urllib3==1.26.18"
     ],
 )
