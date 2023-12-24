@@ -21,7 +21,7 @@ from jupyterMagicCommands.utils.log import NULL_LOGGER
 class DirectoryNotExist(Exception):
     pass
 
-SHELL_DETECT_LIST = ["fish", "bash", "sh", "ash"]
+SHELL_DETECT_LIST = ["bash", "sh"]
 
 class DockerFileSystem(IFileSystem):
     def __init__(self, container: Container, workdir: str = '/', logger: logging.Logger=NULL_LOGGER) -> None:
@@ -57,15 +57,20 @@ class DockerFileSystem(IFileSystem):
         with tempfile.NamedTemporaryFile(mode="w+") as fp:
             fp.write(cmd)
             fp.seek(0)
-            self.copy_to_container(fp.name, fp.name)
+            filename = fp.name
+            self.logger.debug("Commands to run into files: %s", filename)
+            self.logger.debug("Commands: %s", cmd)
+            self.logger.debug("Saved")
+            self.copy_to_container(filename, filename)
+            self.logger.debug("Copying tmp files from %s into container file %s", filename, filename)
             disable_bracketed_paste = 'echo "set enable-bracketed-paste off" > .inputrc && INPUTRC=$PWD/.inputrc'
-            actual_cmd_to_run = f'{disable_bracketed_paste} {self.default_shell} {fp.name}'
+            actual_cmd_to_run = f'{disable_bracketed_paste} {self.default_shell} {filename}'
             if background:
                 if outFile is None:
                     outFile = "/tmp/out.log"
                     print(f"WARNING: outFile is not set, the output of command will written into {outFile} by default")
                 actual_cmd_to_run += f" 1>'{outFile}' 2>&1 &"
-            actual_cmd_to_run = f"bash -c \'{actual_cmd_to_run}\'"
+            actual_cmd_to_run = f"{self.default_shell} -c \'{actual_cmd_to_run}\'"
             self.logger.info("actual command to run: %s", actual_cmd_to_run)
             results = self.container.exec_run(actual_cmd_to_run,
                                               workdir=self._workdir,
@@ -74,7 +79,7 @@ class DockerFileSystem(IFileSystem):
         return results
 
     def exists(self, path: str) -> bool:
-        template = f"""
+        template = f"""\
 if [ -e '{path}' ]; then
     echo "Exists"
 else
@@ -85,7 +90,7 @@ fi
         output: str = results.output.decode()
         if results.exit_code != 0:
             raise Exception(output)
-        return not ("Doesn't exist" in output)
+        return not "Doesn't exist" in output
 
     def makedirs(self, path: str) -> None:
         template = f"""
@@ -110,7 +115,7 @@ mkdir -p '{path}'
             f = open(temp_file_path, mode=mode, encoding=encoding, **kwargs)
         else:
             f = tempfile.NamedTemporaryFile(mode=mode, encoding=encoding, **kwargs)
-        return self.FileInContainerWrapper(self, f, filename)
+        return self.FileInContainerWrapper(self, f, filename) # type: ignore
 
     def getcwd(self) -> str:
         results = self._execute_cmd('pwd')
@@ -152,7 +157,7 @@ rm -rf '{path}'
             self._handle_socket(results, outputter)
 
     def _handle_socket(self, results: ExecResult, outputter: AbstractOutputter) -> None:
-        sock = results.output._sock
+        sock = results.output._sock # pylint: disable=protected-access
 
         sock.setblocking(False)
         sel = selectors.DefaultSelector()
