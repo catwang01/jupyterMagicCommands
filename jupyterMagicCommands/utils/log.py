@@ -1,5 +1,6 @@
 import logging
-from logging import DEBUG, INFO
+from logging import DEBUG
+
 NULL_LOGGER = logging.getLogger('__null__')
 NULL_LOGGER.addHandler(logging.NullHandler())  # read below for reason
 
@@ -8,7 +9,7 @@ def getLogger(name: str) -> logging.Logger:
     logger.setLevel(DEBUG)
 
     streamhandler = logging.StreamHandler()
-    streamhandler.setLevel(INFO)
+    streamhandler.setLevel(DEBUG)
 
     formatter = logging.Formatter("%(asctime)s - %(filename)s - %(name)s - %(levelname)s - %(message)s")
     streamhandler.setFormatter(formatter)
