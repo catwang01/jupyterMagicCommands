@@ -65,10 +65,10 @@ class DockerFileSystem(IFileSystem):
             self.logger.debug("Copying tmp files from %s into container file %s", filename, filename)
             disable_bracketed_paste = '/bin/echo "set enable-bracketed-paste off" > .inputrc && INPUTRC=$PWD/.inputrc'
             actual_cmd_to_run = f'{disable_bracketed_paste} {self.default_shell} {filename}'
-            if background:
-                if outFile is None:
-                    outFile = "/tmp/out.log"
-                    print(f"WARNING: outFile is not set, the output of command will written into {outFile} by default")
+            if background and outFile is None:
+                outFile = "/tmp/out.log"
+                print(f"WARNING: outFile is not set, the output of command will written into {outFile} by default")
+            if outFile is not None:
                 actual_cmd_to_run += f" 1>'{outFile}' 2>&1 &"
             actual_cmd_to_run = f"{self.default_shell} -c \'{actual_cmd_to_run}\'"
             self.logger.info("actual command to run: %s", actual_cmd_to_run)

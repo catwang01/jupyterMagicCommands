@@ -68,10 +68,10 @@ class FileSystem(IFileSystem):
             actual_cmd_to_run = f"bash '{fp.name}'"
             logger.debug(actual_cmd_to_run)
 
-        if background:
-            if outFile is None:
-                outFile = '/tmp/out.log'
+        if background and outFile is None:
+            outFile = '/tmp/out.log'
             print(f"WARNING: outFile is not set, the default output file is {outFile}")
+        if outFile is not None:
             with open(outFile, 'w', encoding='utf8') as logFile:
                 stdout = stderr = logFile
                 process = subprocess.Popen(
@@ -80,7 +80,8 @@ class FileSystem(IFileSystem):
                     stderr=stderr,
                     shell=True
                 )
-            print(f"Run subprocess with pid: {process.pid}. Output to '{outFile}'")
+            if background:
+                print(f"Run subprocess with pid: {process.pid}. Output to '{outFile}'")
             return
 
         child = pexpect.spawn(actual_cmd_to_run)
