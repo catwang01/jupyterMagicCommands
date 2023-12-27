@@ -1,22 +1,23 @@
+import atexit
 from abc import ABCMeta, abstractmethod
+
+from jupyterMagicCommands.utils.general import removeprefix
 
 
 class AbstractOutputterReadCB(metaclass=ABCMeta):
-
     @abstractmethod
     def __call__(self, x) -> None:
         pass
 
-class EmptyOutputterReadCB(AbstractOutputterReadCB):
 
+class EmptyOutputterReadCB(AbstractOutputterReadCB):
     def __call__(self, x) -> None:
         pass
 
-class AbstractOutputter:
 
+class AbstractOutputter:
     def write(self, s) -> None:
         pass
-
 
     def handle_read(self):
         pass
@@ -26,15 +27,15 @@ class AbstractOutputter:
 
 
 class NonInteractiveOutputter(AbstractOutputter):
-
     def write(self, s):
-        print(s, end="")
+        print(removeprefix(s, "\x1b[?1h\x1b="), end="")
+
 
 class FileOutputter(AbstractOutputter):
-
-    def __init__(self, file_path: str) -> None:
+    def __init__(self, file_path: str, **kwargs) -> None:
         self.file_path = file_path
-        self.file = open(file_path, 'w')
+        self.file = open(file_path, "w", **kwargs)
+        atexit.register(self.file.close)
 
     def write(self, s: str):
         self.file.write(s)
