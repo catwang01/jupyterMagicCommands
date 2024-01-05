@@ -26,7 +26,7 @@ class AbstractOutputter:
         pass
 
 
-class NonInteractiveOutputter(AbstractOutputter):
+class BasicInteractiveOutputter(AbstractOutputter):
     def write(self, s):
         print(removeprefix(s, "\x1b[?1h\x1b="), end="")
 
@@ -39,3 +39,4 @@ class FileOutputter(AbstractOutputter):
 
     def write(self, s: str):
         self.file.write(s)
+        self.file.flush()

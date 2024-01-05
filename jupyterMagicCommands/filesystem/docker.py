@@ -12,7 +12,7 @@ from docker.models.containers import Container, ExecResult
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.outputters import (AbstractOutputter,
                                              InteractiveOutputter,
-                                             NonInteractiveOutputter)
+                                             BasicInteractiveOutputter)
 from jupyterMagicCommands.utils.docker import (copy_from_container,
                                                copy_to_container)
 from jupyterMagicCommands.utils.log import NULL_LOGGER
@@ -153,7 +153,7 @@ rm -rf '{path}'
             results = self._execute_cmd(cmd, stdin=True, tty=True, socket=True)
             if results.exit_code is not None and results.exit_code != 0:
                 raise Exception(results)
-            outputter = InteractiveOutputter() if interactive else NonInteractiveOutputter()
+            outputter = InteractiveOutputter() if interactive else BasicInteractiveOutputter()
             self._handle_socket(results, outputter)
 
     def _handle_socket(self, results: ExecResult, outputter: AbstractOutputter) -> None:
