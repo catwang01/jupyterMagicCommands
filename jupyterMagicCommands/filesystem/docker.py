@@ -5,26 +5,35 @@ import selectors
 import tempfile
 import time
 import types
+from pathlib import Path
 from typing import IO, List, Optional
 
 from docker.models.containers import Container, ExecResult
 
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.outputters import (AbstractOutputter,
-                                             InteractiveOutputter,
-                                             BasicInteractiveOutputter)
+                                             BasicInteractiveOutputter,
+                                             InteractiveOutputter)
 from jupyterMagicCommands.utils.docker import (copy_from_container,
                                                copy_to_container)
 from jupyterMagicCommands.utils.log import NULL_LOGGER
+from jupyterMagicCommands.utils.types import nn
 
 
 class DirectoryNotExist(Exception):
     pass
 
+
 SHELL_DETECT_LIST = ["bash", "sh"]
 
+
 class DockerFileSystem(IFileSystem):
-    def __init__(self, container: Container, workdir: str = '/', logger: logging.Logger=NULL_LOGGER) -> None:
+    def __init__(
+        self,
+        container: Container,
+        workdir: str = "/",
+        logger: logging.Logger = NULL_LOGGER,
+    ) -> None:
         self.container = container
         self._workdir = workdir
         self._default_shell: Optional[str] = None
@@ -38,7 +47,9 @@ class DockerFileSystem(IFileSystem):
             self._default_shell_checked = True
         return self._default_shell
 
-    def _detect_default_shells(self, detect_list: List[str]=SHELL_DETECT_LIST) -> Optional[str]:
+    def _detect_default_shells(
+        self, detect_list: List[str] = SHELL_DETECT_LIST
+    ) -> Optional[str]:
         for shell in detect_list:
             results = self.container.exec_run(shell, workdir=self._workdir)
             if results.exit_code == 0:
@@ -51,9 +62,13 @@ class DockerFileSystem(IFileSystem):
     def copy_from_container(self, src: str, dst: str):
         copy_from_container(self.container, src, dst)
 
-    def _execute_cmd(self, cmd: str,
-                            background: bool=False,
-                            outFile: Optional[str]=None, **kwargs) -> ExecResult:
+    def _execute_cmd(
+        self,
+        cmd: str,
+        background: bool = False,
+        outFile: Optional[str] = None,
+        **kwargs,
+    ) -> ExecResult:
         with tempfile.NamedTemporaryFile(mode="w+") as fp:
             fp.write(cmd)
             fp.seek(0)
@@ -62,20 +77,23 @@ class DockerFileSystem(IFileSystem):
             self.logger.debug("Commands: %s", cmd)
             self.logger.debug("Saved")
             self.copy_to_container(filename, filename)
-            self.logger.debug("Copying tmp files from %s into container file %s", filename, filename)
+            self.logger.debug(
+                "Copying tmp files from %s into container file %s", filename, filename
+            )
             disable_bracketed_paste = '/bin/echo "set enable-bracketed-paste off" > .inputrc && INPUTRC=$PWD/.inputrc'
-            actual_cmd_to_run = f'{disable_bracketed_paste} {self.default_shell} {filename}'
-            if background and outFile is None:
-                outFile = "/tmp/out.log"
-                print(f"WARNING: outFile is not set, the output of command will written into {outFile} by default")
+            actual_cmd_to_run = (
+                f"{disable_bracketed_paste} {self.default_shell} {filename}"
+            )
             if outFile is not None:
-                actual_cmd_to_run += f" 1>'{outFile}' 2>&1 &"
-            actual_cmd_to_run = f"{self.default_shell} -c \'{actual_cmd_to_run}\'"
+                self.makedirs(str(Path(nn(outFile)).parent))
+                actual_cmd_to_run += f" 1>'{outFile}' 2>&1"
+            if background:
+                actual_cmd_to_run += " &"
+            actual_cmd_to_run = f"{self.default_shell} -c '{actual_cmd_to_run}'"
             self.logger.info("actual command to run: %s", actual_cmd_to_run)
-            results = self.container.exec_run(actual_cmd_to_run,
-                                              workdir=self._workdir,
-                                              user="root",
-                                              **kwargs)
+            results = self.container.exec_run(
+                actual_cmd_to_run, workdir=self._workdir, user="root", **kwargs
+            )
         return results
 
     def exists(self, path: str) -> bool:
@@ -102,12 +120,14 @@ mkdir -p '{path}'
             raise Exception(output)
 
     def _is_mode_require_file_exists(self, mode: str) -> bool:
-        return 'r' in mode or 'a' in mode
+        return "r" in mode or "a" in mode
 
     def _get_temp_file_path(self) -> str:
         return f"/tmp/{time.time()}"
 
-    def open(self, filename: str, mode: str="w+", encoding: str='utf8', **kwargs) -> IO:
+    def open(
+        self, filename: str, mode: str = "w+", encoding: str = "utf8", **kwargs
+    ) -> IO:
         f: IO
         if self._is_mode_require_file_exists(mode):
             temp_file_path = self._get_temp_file_path()
@@ -115,10 +135,10 @@ mkdir -p '{path}'
             f = open(temp_file_path, mode=mode, encoding=encoding, **kwargs)
         else:
             f = tempfile.NamedTemporaryFile(mode=mode, encoding=encoding, **kwargs)
-        return self.FileInContainerWrapper(self, f, filename) # type: ignore
+        return self.FileInContainerWrapper(self, f, filename)  # type: ignore
 
     def getcwd(self) -> str:
-        results = self._execute_cmd('pwd')
+        results = self._execute_cmd("pwd")
         output = results.output.decode().strip()
         if results.exit_code != 0:
             raise Exception(output)
@@ -141,11 +161,17 @@ rm -rf '{path}'
         if results.exit_code != 0:
             raise Exception(output)
 
-    def system(self, cmd: str,
-                background: bool=False,
-                interactive: bool=False,
-                outFile: Optional[str]=None) -> None:
-        if background:
+    def system(
+        self,
+        cmd: str,
+        background: bool = False,
+        interactive: bool = False,
+        outFile: Optional[str] = None,
+    ) -> None:
+        if background and outFile is None:
+            outFile = "/tmp/out.log"
+            print(f"WARNING: outFile is not set, the default output file is {outFile}")
+        if outFile is not None:
             results = self._execute_cmd(cmd, background=background, outFile=outFile, detach=True)
             if results.exit_code and results.exit_code != 0:
                 raise Exception(results.output.decode())
@@ -153,11 +179,13 @@ rm -rf '{path}'
             results = self._execute_cmd(cmd, stdin=True, tty=True, socket=True)
             if results.exit_code is not None and results.exit_code != 0:
                 raise Exception(results)
-            outputter = InteractiveOutputter() if interactive else BasicInteractiveOutputter()
+            outputter = (
+                InteractiveOutputter() if interactive else BasicInteractiveOutputter()
+            )
             self._handle_socket(results, outputter)
 
     def _handle_socket(self, results: ExecResult, outputter: AbstractOutputter) -> None:
-        sock = results.output._sock # pylint: disable=protected-access
+        sock = results.output._sock  # pylint: disable=protected-access
 
         sock.setblocking(False)
         sel = selectors.DefaultSelector()
@@ -165,10 +193,12 @@ rm -rf '{path}'
         def read(key, mask):
             conn = key.fileobj
             dataToSend = key.data.dataToSend
+
             def close_sock():
-                self.logger.debug('closing', conn)
+                self.logger.debug("closing", conn)
                 sel.unregister(conn)
                 conn.close()
+
             if mask & selectors.EVENT_READ:
                 length = 1024
                 data = conn.recv(length)
@@ -187,7 +217,7 @@ rm -rf '{path}'
             return len(sel.get_map())
 
         outputter.register_read_callback(
-            lambda x: data.dataToSend.append(x.encode('utf8'))
+            lambda x: data.dataToSend.append(x.encode("utf8"))
         )
         shouldContinue = True
         while shouldContinue:
@@ -202,8 +232,7 @@ rm -rf '{path}'
                 data.dataToSend.append(b"\x03")
 
     class FileInContainerWrapper:
-
-        def __init__(self, docker: 'DockerFileSystem', file: IO, path: str):
+        def __init__(self, docker: "DockerFileSystem", file: IO, path: str):
             self.docker = docker
             self.file = file
             self.path = path
@@ -212,13 +241,15 @@ rm -rf '{path}'
             # Attribute lookups are delegated to the underlying file
             # and cached for non-numeric results
             # (i.e. methods are cached, closed and friends are not)
-            file = self.__dict__['file']
+            file = self.__dict__["file"]
             a = getattr(file, name)
-            if hasattr(a, '__call__'):
+            if hasattr(a, "__call__"):
                 func = a
+
                 @functools.wraps(func)
                 def func_wrapper(*args, **kwargs):
                     return func(*args, **kwargs)
+
                 a = func_wrapper
             if not isinstance(a, int):
                 setattr(self, name, a)

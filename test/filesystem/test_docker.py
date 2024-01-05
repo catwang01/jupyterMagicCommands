@@ -1,3 +1,6 @@
+import re
+import textwrap
+
 import docker
 import pytest
 
@@ -10,11 +13,15 @@ def client():
     client = docker.from_env()
     return client
 
-@pytest.fixture(scope="class", params=[
-    ("bash", "bash-test"), 
-    ("ubuntu", "ubuntu-test"), 
-    ("docker:dind", "dind-test")
-])
+
+@pytest.fixture(
+    scope="class",
+    params=[
+        ("bash", "bash-test"),
+        ("ubuntu", "ubuntu-test"),
+        ("docker:dind", "dind-test"),
+    ],
+)
 def container(client, request):
     imageName, containerName = request.param
     try:
@@ -26,99 +33,137 @@ def container(client, request):
             stdin_open=True,
             remove=True,
             detach=True,
-            privileged=True
+            privileged=True,
         )
     yield newContainer
     # newContainer.stop()
 
 
 @pytest.fixture
-def dockerfilesystem(container) -> IFileSystem:
+def fs(container) -> IFileSystem:
     fs = DockerFileSystem(container)
     return fs
 
 
 class TestDockerFileSystem:
-    def test_if_default_shell_can_be_detect_correctly(self, container, dockerfilesystem):
+    def test_if_default_shell_can_be_detect_correctly(self, container, fs):
         if container.name == "dind-test":
-            assert dockerfilesystem.default_shell == "sh"
+            assert fs.default_shell == "sh"
         else:
-            assert dockerfilesystem.default_shell == "bash"
+            assert fs.default_shell == "bash"
 
-    def test_check_whether_file_exists_in_container(self, tmp_path, dockerfilesystem):
+    def test_check_whether_file_exists_in_container(self, tmp_path, fs):
         path = f"{tmp_path}/a/b/c"
-        dockerfilesystem.makedirs(path)
-        assert dockerfilesystem.exists(path) == True
+        fs.makedirs(path)
+        assert fs.exists(path) == True
 
-    def test_write_file_to_container(self, tmp_path, container, dockerfilesystem):
+    def test_write_file_to_container(self, tmp_path, container, fs):
         path = f"/{tmp_path}/app/a/b/c/test.txt"
-        with dockerfilesystem.open(path, "w", encoding="utf8") as f:
+        with fs.open(path, "w", encoding="utf8") as f:
             f.write("hello")
             f.write("hello")
 
-        assert dockerfilesystem.exists(path)
+        assert fs.exists(path)
         assert container.exec_run(f"cat {path}").output.decode() == "hellohello"
 
-    def test_chdir_and_getcwd_in_container(self, tmp_path, dockerfilesystem):
+    def test_chdir_and_getcwd_in_container(self, tmp_path, fs):
         path = f"{tmp_path}/test"
-        assert dockerfilesystem.getcwd() == "/"
+        assert fs.getcwd() == "/"
 
-        dockerfilesystem.makedirs(path)
-        assert dockerfilesystem.exists(path) == True
+        fs.makedirs(path)
+        assert fs.exists(path) == True
 
-        dockerfilesystem.chdir(path)
-        assert dockerfilesystem.getcwd() == path
+        fs.chdir(path)
+        assert fs.getcwd() == path
 
-    def test_chdir_to_relative_path_and_getcwd_in_container(
-        self, tmp_path, dockerfilesystem
-    ):
+    def test_chdir_to_relative_path_and_getcwd_in_container(self, tmp_path, fs):
         path = f"{tmp_path}/test"
-        assert dockerfilesystem.getcwd() == "/"
+        assert fs.getcwd() == "/"
 
-        dockerfilesystem.makedirs(path)
-        assert dockerfilesystem.exists(path) == True
+        fs.makedirs(path)
+        assert fs.exists(path) == True
 
-        dockerfilesystem.chdir(path)
-        assert dockerfilesystem.getcwd() == path
+        fs.chdir(path)
+        assert fs.getcwd() == path
 
         path2 = f"{tmp_path}/hello/world"
-        dockerfilesystem.makedirs(path2)
-        assert dockerfilesystem.exists(path2) == True
+        fs.makedirs(path2)
+        assert fs.exists(path2) == True
 
-        dockerfilesystem.chdir(path2)
-        assert dockerfilesystem.getcwd() == path2
+        fs.chdir(path2)
+        assert fs.getcwd() == path2
 
-    def test_removedirs_in_container(self, tmp_path, dockerfilesystem):
+    def test_removedirs_in_container(self, tmp_path, fs):
         path = f"{tmp_path}/app/a/b/c/test.txt"
 
-        assert dockerfilesystem.exists(path) == False
+        assert fs.exists(path) == False
 
-        with dockerfilesystem.open(path, "w", encoding="utf8") as f:
+        with fs.open(path, "w", encoding="utf8") as f:
             f.write("hello")
             f.write("hello")
-        assert dockerfilesystem.exists(path) == True
+        assert fs.exists(path) == True
 
-        dockerfilesystem.removedirs(path)
-        assert dockerfilesystem.exists(path) == False
+        fs.removedirs(path)
+        assert fs.exists(path) == False
 
-    def test_file_append(self, tmp_path, container, dockerfilesystem):
+    def test_file_append(self, tmp_path, container, fs):
         path = f"{tmp_path}/test.txt"
 
-        with dockerfilesystem.open(path, "w", encoding="utf8") as f:
+        with fs.open(path, "w", encoding="utf8") as f:
             f.write("hello")
         assert container.exec_run(f"cat {path}").output.decode() == "hello"
 
-        with dockerfilesystem.open(path, "a", encoding="utf8") as f:
+        with fs.open(path, "a", encoding="utf8") as f:
             f.write(" world")
         assert container.exec_run(f"cat {path}").output.decode() == "hello world"
 
-        with dockerfilesystem.open(path, "r", encoding="utf8") as f:
+        with fs.open(path, "r", encoding="utf8") as f:
             s = f.read()
         assert s == "hello world"
 
-    def test_copy_to_container(self, tmp_path, dockerfilesystem):
-        p = str(tmp_path / 'test.txt')
-        with open(p, 'w', encoding='utf8') as f:
+    def test_copy_to_container(self, tmp_path, fs):
+        p = str(tmp_path / "test.txt")
+        with open(p, "w", encoding="utf8") as f:
             f.write("hello world")
-        dockerfilesystem.copy_to_container(p, p)
-        assert dockerfilesystem.exists(p)
+        fs.copy_to_container(p, p)
+        assert fs.exists(p)
+
+
+class TestDockerFileSystemSysemCommand:
+    def test_filesystem(self, fs: IFileSystem, capsys):
+        fs.system("echo hello")
+        captured = capsys.readouterr()
+        assert captured.out == "hello\r\n"
+
+    def test_filesystem_with_filename_save_output_into_file(
+        self, fs: IFileSystem, tmp_path, capsys
+    ):
+        filePath = tmp_path / "test.txt"
+        fs.system("echo hello", outFile=filePath)
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert fs.exists(filePath) == True
+        with fs.open(filePath, "r", "utf8") as f:
+            assert f.read() == "hello\n"
+
+    def test_filesystem_background(self, fs: IFileSystem, capsys):
+        filePath = "/tmp/out.log"
+        fs.removedirs(filePath)
+        fs.system("echo hello", background=True)
+        captured = capsys.readouterr()
+        expectedPattern = f"""\
+        WARNING: outFile is not set, the default output file is {filePath}
+        """
+        assert re.search(textwrap.dedent(expectedPattern), captured.out) is not None
+        assert fs.exists(filePath) == True
+        with fs.open(filePath, "r", "utf8") as f:
+            assert f.read() == "hello\n"
+
+    def test_filesystem_background_filename(self, fs: IFileSystem, tmp_path, capsys):
+        filePath = tmp_path / "test.txt"
+        fs.system("echo hello", background=True, outFile=filePath)
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert fs.exists(filePath) == True
+        with fs.open(filePath, "r", "utf8") as f:
+            assert f.read() == "hello\n"
