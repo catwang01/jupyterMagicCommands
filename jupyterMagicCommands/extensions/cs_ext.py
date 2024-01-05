@@ -68,7 +68,7 @@ def runCsharp(cell, args):
         tmpFile.write_text(code)
         for packageInfo in args.packageInfos:
             if "version" in packageInfo:
-                executeCmd(f"dotnet add package {packageInfo['name']} --verion {packageInfo['version']}", cwd=tmpDir, verbose=verbose)
+                executeCmd(f"dotnet add package {packageInfo['name']} --version {packageInfo['version']}", cwd=tmpDir, verbose=verbose)
             else:
                 executeCmd(f"dotnet add package {packageInfo['name']}", cwd=tmpDir, verbose=verbose)
         executeCmd("dotnet run", cwd=tmpDir, verbose=True)
@@ -85,20 +85,20 @@ def transformLogLevel(s):
 
 def processPackageInfo(s):
     ret = {}
-    infos = s.split(":")
+    infos = s.split("@")
     if len(infos) == 1:
         ret['name'] = infos[0]
     elif len(infos) == 2:
         ret['name'] = infos[0]
         ret['version'] = infos[1]
     else:
-        raise Exception(f"Not a valid package info: {s}. Package info should be <package-name> or <package-name>:<version>")
+        raise Exception(f"Not a valid package info: {s}. Package info should be <package-name> or <package-name>@<version>")
     return ret
 
 def cs(line, cell):
     parser = argparse.ArgumentParser()
     parser.add_argument('--logLevel', default='INFO', type=transformLogLevel)
-    parser.add_argument('--addPackage', dest="packageInfos", type=processPackageInfo , action="append" , default=[])
+    parser.add_argument('--addPackage', dest="packageInfos", type=processPackageInfo , action="append" , default=[], help="package information formatted as <packagename>@<version>")
     parser.add_argument('--verbose', action="store_true", default=False)
     if line.strip() != '':
         args = parser.parse_args(line.strip(' ').split(' '))
