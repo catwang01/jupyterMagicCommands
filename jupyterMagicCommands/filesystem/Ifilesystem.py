@@ -24,7 +24,11 @@ class IFileSystem(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def removedirs(self, path: str) -> None:
+    def remove(self, path: str) -> None:
+        pass
+
+    @abstractmethod
+    def is_dir(self, path: str) -> bool:
         pass
 
     @abstractmethod

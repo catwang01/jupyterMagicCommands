@@ -1,4 +1,5 @@
 import functools
+import textwrap
 import logging
 import os
 import selectors
@@ -152,7 +153,23 @@ mkdir -p '{path}'
         else:
             self._workdir = os.path.join(self._workdir, path)
 
-    def removedirs(self, path: str) -> None:
+    def is_dir(self, path: str) -> bool:
+        if not self.exists(path):
+            raise Exception(f"Path '{path}' doesn't exist")
+        template = f"""
+        if [[ -d '{path}' ]]; then
+            echo "d"
+        else
+            echo "f"
+        fi
+        """
+        result = self._execute_cmd(textwrap.dedent(template))
+        output = result.output.decode()
+        if result.exit_code != 0:
+            raise Exception(output)
+        return result == "d"
+
+    def remove(self, path: str) -> None:
         template = f"""
 rm -rf '{path}'
 """

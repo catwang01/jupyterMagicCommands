@@ -34,8 +34,17 @@ class FileSystem(IFileSystem):
     def chdir(self, path: str) -> None:
         os.chdir(path)
 
-    def removedirs(self, path: str) -> None:
-        shutil.rmtree(path)
+    def is_dir(self, path: str) -> bool:
+        return os.path.isdir(path)
+
+    def remove(self, path: str) -> None:
+        if self.exists(path):
+            if self.is_dir(path):
+                shutil.rmtree(path)
+            else:
+                os.remove(path)
+        else:
+            raise Exception(f"Path '{path}' does not exist")
 
     def system(
         self,

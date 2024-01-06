@@ -142,7 +142,7 @@ def _prepare(args: BashArgsNS, fs: IFileSystem, logger: Logger) -> None:
     if fs.exists(args.cwd):
         logger.debug("Folder %r exists", args.cwd)
         if args.force_create:
-            fs.removedirs(args.cwd)
+            fs.remove(args.cwd)
     else:
         logger.debug("Folder %r doesn't exist", args.cwd)
         if args.create:
