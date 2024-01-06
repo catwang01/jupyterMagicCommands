@@ -11,10 +11,13 @@ from typing import IO, List, Optional
 
 from docker.models.containers import Container, ExecResult
 
+from IPython.core.interactiveshell import InteractiveShell
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.outputters import (AbstractOutputter,
-                                             BasicInteractiveOutputter,
                                              InteractiveOutputter)
+from jupyterMagicCommands.outputters.abstract_outputter_factory import AbstractOutputterFactory
+from jupyterMagicCommands.outputters.basic_interactive_outputter import BasicInteractiveOutputter
+from jupyterMagicCommands.outputters.variable_outputter import VariableOutputter
 from jupyterMagicCommands.utils.docker import (copy_from_container,
                                                copy_to_container)
 from jupyterMagicCommands.utils.log import NULL_LOGGER
@@ -32,10 +35,12 @@ class DockerFileSystem(IFileSystem):
     def __init__(
         self,
         container: Container,
+        outputterFactory: AbstractOutputterFactory,
         workdir: str = "/",
         logger: logging.Logger = NULL_LOGGER,
     ) -> None:
         self.container = container
+        self.outputterFactory = outputterFactory
         self._workdir = workdir
         self._default_shell: Optional[str] = None
         self._default_shell_checked: bool = False
@@ -184,8 +189,16 @@ rm -rf '{path}'
         background: bool = False,
         interactive: bool = False,
         outFile: Optional[str] = None,
+        outVar: Optional[str] = None,
     ) -> None:
-        if background and outFile is None:
+        if interactive and (outFile is not None or outVar is not None):
+            raise Exception(
+                "interactive and outFile/outVar cannot be set at the same time"
+            )
+        if outFile is not None and outVar is not None:
+            raise Exception("outFile and outVar cannot be set at the same time")
+
+        if background and outFile is None and outVar is None:
             outFile = "/tmp/out.log"
             print(f"WARNING: outFile is not set, the default output file is {outFile}")
         if outFile is not None:
@@ -196,9 +209,7 @@ rm -rf '{path}'
             results = self._execute_cmd(cmd, stdin=True, tty=True, socket=True)
             if results.exit_code is not None and results.exit_code != 0:
                 raise Exception(results)
-            outputter = (
-                InteractiveOutputter() if interactive else BasicInteractiveOutputter()
-            )
+            outputter = self.outputterFactory.create_outputter(interactive, outFile, outVar)
             self._handle_socket(results, outputter)
 
     def _handle_socket(self, results: ExecResult, outputter: AbstractOutputter) -> None:

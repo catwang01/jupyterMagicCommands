@@ -1,7 +1,7 @@
 from jupyter_ui_poll import ui_events
 import ipywidgets as widgets
-from jupyterMagicCommands.outputters.outputter import AbstractOutputterReadCB
-from jupyterMagicCommands.outputters.outputter import AbstractOutputter, EmptyOutputterReadCB
+from jupyterMagicCommands.outputters.abstract_outputter import AbstractOutputterReadCB
+from jupyterMagicCommands.outputters.abstract_outputter import AbstractOutputter, EmptyOutputterReadCB
 
 
 from IPython.display import display

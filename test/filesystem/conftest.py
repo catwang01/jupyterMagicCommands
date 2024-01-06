@@ -1,9 +1,13 @@
 import docker
 import pytest
+from IPython.core.interactiveshell import InteractiveShell
+from IPython.testing.globalipapp import get_ipython
 
 from jupyterMagicCommands.filesystem.docker import DockerFileSystem
 from jupyterMagicCommands.filesystem.filesystem import FileSystem
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
+from jupyterMagicCommands.outputters import (BasicFileSystemOutputterFactory,
+                                             DockerFileSystemOutputterFactory)
 
 
 @pytest.fixture(scope="module")
@@ -38,14 +42,20 @@ def container(client, request):
 
 
 @pytest.fixture(scope="module")
-def dockerfs(container) -> IFileSystem:
-    fs = DockerFileSystem(container)
+def ipython_shell() -> InteractiveShell:
+    return get_ipython()
+
+@pytest.fixture(scope="module")
+def dockerfs(container, ipython_shell) -> IFileSystem:
+    outputterFactory = DockerFileSystemOutputterFactory(ipython_shell)
+    fs = DockerFileSystem(container, outputterFactory)
     return fs
 
 
 @pytest.fixture(scope="module")
-def basicfs() -> IFileSystem:
-    return FileSystem()
+def basicfs(ipython_shell) -> IFileSystem:
+    outputterFactory = BasicFileSystemOutputterFactory(ipython_shell)
+    return FileSystem(outputterFactory)
 
 
 @pytest.fixture(

@@ -48,3 +48,17 @@ class TestDockerFileSystemSysemCommand:
         assert fs.exists(filePath) == True
         with fs.open(filePath, "r", "utf8") as f:
             assert f.read() == "hello\n"
+
+    def test_filesystem_save_output_into_variable(self, fs: IFileSystem, ipython_shell, capsys):
+        fs.system("echo hello", outVar="out")
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert ipython_shell.user_ns["out"] == "hello\r\n"
+
+
+    def test_sequence_calls_clear_previous_results(self, fs: IFileSystem, ipython_shell, capsys):
+        fs.system("echo hello", outVar="out")
+        fs.system("echo world", outVar="out")
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert ipython_shell.user_ns["out"] == "world\r\n"

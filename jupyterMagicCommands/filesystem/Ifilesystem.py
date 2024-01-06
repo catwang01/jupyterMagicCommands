@@ -1,8 +1,8 @@
 from typing import IO, Optional
 from abc import abstractmethod, ABCMeta
 
-class IFileSystem(metaclass=ABCMeta):
 
+class IFileSystem(metaclass=ABCMeta):
     @abstractmethod
     def exists(self, path: str) -> bool:
         pass
@@ -32,5 +32,12 @@ class IFileSystem(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def system(self, cmd: str, background: bool=False, interactive: bool=False, outFile: Optional[str]=None) -> None:
+    def system(
+        self,
+        cmd: str,
+        background: bool = False,
+        interactive: bool = False,
+        outFile: Optional[str] = None,
+        outVar: Optional[str] = None,
+    ) -> None:
         pass
