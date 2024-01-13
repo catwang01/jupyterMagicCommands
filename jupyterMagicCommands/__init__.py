@@ -5,7 +5,6 @@ if IS_IN_JUPYTER:
     from .extensions import bash_ext
     from .extensions import clickhouse_ext
     from .extensions import plantuml_ext
-    from .extensions import html_ext
     from .extensions import writefile_ext
     from .extensions import pwsh_ext
     from .extensions import cs_ext
@@ -18,7 +17,6 @@ if IS_IN_JUPYTER:
             bash_ext,
             clickhouse_ext,
             plantuml_ext,
-            html_ext,
             writefile_ext,
             pwsh_ext,
             cs_ext,
