@@ -8,20 +8,19 @@ from operator import itemgetter
 from typing import Optional
 
 import pexpect
+from IPython import get_ipython
+from IPython.core.magic import Magics, cell_magic, magics_class
 from IPython.display import display
 
-from IPython.core.magic import (Magics, magics_class, cell_magic)
-
+from jupyterMagicCommands.extensions.constants import (
+    EMPTY_CONTAINER_NAME, JUPYTER_MAGIC_COMMAND_BASH_CURRENT_CONTAINER)
 # The class MUST call this class decorator at creation time
-from jupyterMagicCommands.filesystem.filesystem_factory import FileSystemFactory
+from jupyterMagicCommands.filesystem.filesystem_factory import \
+    FileSystemFactory
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.utils.functools import suppress
 from jupyterMagicCommands.utils.log import NULL_LOGGER, getLogger
 from jupyterMagicCommands.utils.parser import parse_logLevel
-from jupyterMagicCommands.extensions.constants import (
-    EMPTY_CONTAINER_NAME,
-    JUPYTER_MAGIC_COMMAND_BASH_CURRENT_CONTAINER,
-)
 
 global_logger = getLogger(__name__)
 
@@ -276,7 +275,7 @@ class BashMagics(Magics):
     def bash(self, line: str, cell: str):
         args = get_args(line)
         global_logger.setLevel(args.logLevel)
-        fs = FileSystemFactory.get_filesystem(args.container, global_logger)
+        fs = FileSystemFactory.get_filesystem(args.container, get_ipython(), global_logger)
         if fs is None:
             return
         olddir = fs.getcwd()
