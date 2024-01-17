@@ -13,10 +13,12 @@ from IPython.core.magic import Magics, cell_magic, magics_class
 from IPython.display import display
 
 from jupyterMagicCommands.extensions.constants import (
-    EMPTY_CONTAINER_NAME, JUPYTER_MAGIC_COMMAND_BASH_CURRENT_CONTAINER)
+    EMPTY_CONTAINER_NAME,
+    JUPYTER_MAGIC_COMMAND_BASH_CURRENT_CONTAINER,
+)
+
 # The class MUST call this class decorator at creation time
-from jupyterMagicCommands.filesystem.filesystem_factory import \
-    FileSystemFactory
+from jupyterMagicCommands.filesystem.filesystem_factory import FileSystemFactory
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.utils.functools import suppress
 from jupyterMagicCommands.utils.log import NULL_LOGGER, getLogger
@@ -48,10 +50,10 @@ class NotValidBackend(Exception):
 
 @dataclass
 class BashArgsNS:
-    force_create: bool = False
+    init: bool = False
     cwd: str = "."
     create: bool = False
-    initialize: bool = False
+    init: bool = False
     container: Optional[str] = None
     verbose: bool = False
     backend: str = "plain"
@@ -60,6 +62,7 @@ class BashArgsNS:
     background: bool = False
     outFile: Optional[str] = None
     outVar: Optional[str] = None
+    interactive: bool = False
 
 
 def initTerminal(initialOptions):
@@ -104,11 +107,11 @@ def plainExecuteCommand(command: str, args: BashArgsNS, **kwargs):
         print(command)
     if kwargs.get("fs", None) is not None:
         kwargs["fs"].system(
-            command, 
-            background=background, 
-            interactive=interactive, 
+            command,
+            background=background,
+            interactive=interactive,
             outFile=outFile,
-            outVar=outVar
+            outVar=outVar,
         )
     else:
         raise Exception("FileSystem is not initliazed for a container!")
@@ -164,22 +167,6 @@ def preprocessCommand(command: str, args: BashArgsNS) -> str:
     return command
 
 
-def _prepare(args: BashArgsNS, fs: IFileSystem, logger: Logger) -> None:
-    if fs.exists(args.cwd):
-        logger.debug("Folder %r exists", args.cwd)
-        if args.force_create:
-            fs.remove(args.cwd)
-    else:
-        logger.debug("Folder %r doesn't exist", args.cwd)
-        if args.create:
-            logger.debug(f"Create folder {args.cwd}")
-            fs.makedirs(args.cwd)
-        else:
-            raise Exception(
-                f"Accessing non existing working directory: {args.cwd}! You can specify --create flag to create an empty working directory"
-            )
-    fs.chdir(args.cwd)
-
 def get_args(line: str) -> BashArgsNS:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -198,11 +185,10 @@ def get_args(line: str) -> BashArgsNS:
         help="Create the working directory if not existing. Do nothing if the directory exists",
     )
     parser.add_argument(
-        "-f",
-        "--force-create",
+        "--init",
         action="store_true",
         default=False,
-        help="Force create the working directory. If it exists, remove it and create an empty one. if not, create an empty one.",
+        help="Force create the working directory. If it exists, remove it and create an empty one. if not, create an empty one. It can't be used without --create",
     )
     parser.add_argument(
         "-c",
@@ -254,35 +240,78 @@ def get_args(line: str) -> BashArgsNS:
             "Trying to use an existing docker but no previously used docker container exists. Use `bash -c <container>` first"
         )
         exit(-1)
+    if args.init and not args.create:
+        global_logger.error("--init can't be used without --create!")
+        exit(-1)
     return args
+
+
+class BashExtension:
+    def __init__(self, args: BashArgsNS, fs: IFileSystem, cell: str, logger: Logger):
+        self.args = args
+        self.fs = fs
+        self.cell = cell
+        self.logger = logger
+
+    def run(self) -> None:
+        self.logger.setLevel(self.args.logLevel)
+        if self.fs is None:
+            return
+        olddir = self.fs.getcwd()
+        try:
+            self.logger.debug("Current dir: %s", self.fs.getcwd())
+            self.logger.debug("The argument are %s", self.args)
+
+            command = preprocessCommand(self.cell, self.args)
+            self._prepare(self.args, self.fs, self.logger)
+            executeCmd(command, self.args, fs=self.fs, logger=self.logger)
+        finally:
+            self.fs.chdir(olddir)
+
+    def _prepare(self, args: BashArgsNS, fs: IFileSystem, logger: Logger) -> None:
+        folderExists = fs.exists(args.cwd)
+        if args.create:
+            if folderExists:
+                if args.init:
+                    logger.debug(
+                        "Folder %r exists and we need to remove it because --init is specified",
+                        args.cwd,
+                    )
+                    fs.remove(args.cwd)
+                    fs.makedirs(args.cwd)
+                else:
+                    logger.debug(
+                        "Folder %r exists and we don't need to remove it", args.cwd
+                    )
+            else:
+                fs.makedirs(args.cwd)
+        else:
+            if not folderExists:
+                raise Exception(
+                    f"Accessing non existing working directory: {args.cwd}! You can specify --create flag to create an empty working directory"
+                )
+        fs.chdir(args.cwd)
+
 
 @magics_class
 class BashMagics(Magics):
-
-    def _bash(self, args: BashArgsNS, fs: IFileSystem, cell: str):
-        global_logger.debug("Current dir: %s", fs.getcwd())
-        global_logger.debug("The argument are %s", args)
-
-        command = preprocessCommand(cell, args)
-        _prepare(args, fs, global_logger)
-        executeCmd(command, args, fs=fs, logger=global_logger)
-
     @cell_magic
     @suppress(
-        KeyboardInterrupt, onerror=lambda sp: print(f"{os.linesep}KeyboardInteruptted ^C")
+        KeyboardInterrupt,
+        onerror=lambda sp: print(f"{os.linesep}KeyboardInteruptted ^C"),
     )
     @suppress(Exception)
     def bash(self, line: str, cell: str):
         args = get_args(line)
-        global_logger.setLevel(args.logLevel)
-        fs = FileSystemFactory.get_filesystem(args.container, get_ipython(), global_logger)
+        fs = FileSystemFactory.get_filesystem(
+            args.container, get_ipython(), global_logger
+        )
         if fs is None:
+            global_logger.error("Initialize a None FileSystem")
             return
-        olddir = fs.getcwd()
-        try:
-            self._bash(args, fs, cell)
-        finally:
-            fs.chdir(olddir)
+        bash = BashExtension(args, fs, cell, global_logger)
+        bash.run()
+
 
 # load point
 def load_ipython_extension(ipython):
