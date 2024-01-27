@@ -1,28 +1,17 @@
 from abc import ABCMeta, abstractmethod
 
+from jupyterMagicCommands.outputters.outputter_cb import AbstractOutputterReadCB
 
+class AbstractOutputter(metaclass=ABCMeta):
 
-class AbstractOutputterReadCB(metaclass=ABCMeta):
     @abstractmethod
-    def __call__(self, x) -> None:
+    def write(self, s: str) -> None:
         pass
 
-
-class EmptyOutputterReadCB(AbstractOutputterReadCB):
-    def __call__(self, x) -> None:
+    @abstractmethod
+    def handle_read(self) -> None:
         pass
 
-
-class AbstractOutputter:
-    def write(self, s) -> None:
+    @abstractmethod
+    def register_read_callback(self, cb: AbstractOutputterReadCB) -> None:
         pass
-
-    def handle_read(self):
-        pass
-
-    def register_read_callback(self, cb) -> None:
-        pass
-
-
-
-

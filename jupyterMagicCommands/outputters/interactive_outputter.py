@@ -1,9 +1,8 @@
 from jupyter_ui_poll import ui_events
 import ipywidgets as widgets
-from jupyterMagicCommands.outputters.abstract_outputter import AbstractOutputterReadCB
-from jupyterMagicCommands.outputters.abstract_outputter import AbstractOutputter, EmptyOutputterReadCB
-
-
+from jupyterMagicCommands.outputters.outputter_cb import AbstractOutputterReadCB, EmptyOutputterReadCB
+from jupyterMagicCommands.outputters.abstract_outputter import AbstractOutputter
+from overrides import override
 from IPython.display import display
 
 
@@ -22,6 +21,7 @@ class InteractiveOutputter(AbstractOutputter):
         self.read_cb: AbstractOutputterReadCB = EmptyOutputterReadCB()
         display(widgets.VBox([self.out, self.text, self.sendEnterWidget]))
 
+    @override
     def register_read_callback(self, cb) -> None:
         self.read_cb = cb
         def wrapped_cb(widget):
@@ -31,8 +31,10 @@ class InteractiveOutputter(AbstractOutputter):
                cb(widget.value)
         self.text.on_submit(wrapped_cb)
 
+    @override
     def write(self, s):
         self.out.append_stdout(s)
 
+    @override
     def handle_read(self):
         self.poll(10000)

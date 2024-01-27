@@ -1,20 +1,25 @@
+from typing import Optional
 from jupyterMagicCommands.outputters import (
     FileOutputter,
     InteractiveOutputter,
     VariableOutputter,
     BasicInteractiveOutputter,
     AbstractOutputterFactory,
-    AbstractOutputter
+    AbstractOutputter,
 )
 from IPython.core.interactiveshell import InteractiveShell
 
 
 class BasicFileSystemOutputterFactory(AbstractOutputterFactory):
-
     def __init__(self, shell: InteractiveShell):
         self.shell = shell
 
-    def create_outputter(self, interactive, outFile, outVar):
+    def create_outputter(
+        self,
+        interactive: bool,
+        outFile: Optional[str] = None,
+        outVar: Optional[str] = None,
+    ) -> AbstractOutputter:
         outputter: AbstractOutputter
         if interactive:
             outputter = InteractiveOutputter()
@@ -29,11 +34,15 @@ class BasicFileSystemOutputterFactory(AbstractOutputterFactory):
 
 
 class DockerFileSystemOutputterFactory(AbstractOutputterFactory):
-
     def __init__(self, shell: InteractiveShell):
         self.shell = shell
 
-    def create_outputter(self, interactive, outFile, outVar):
+    def create_outputter(
+        self,
+        interactive: bool,
+        outFile: Optional[str] = None,
+        outVar: Optional[str] = None,
+    ) -> AbstractOutputter:
         outputter: AbstractOutputter
         if interactive:
             outputter = InteractiveOutputter()
