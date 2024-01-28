@@ -1,8 +1,11 @@
 {
     "python.testing.pytestEnabled": true,
-    "python.testing.pytestArgs": [ "-s", "test" ],
+    "python.testing.pytestArgs": [
+        "test"
+    ],
 
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
     },
+    "python.testing.unittestEnabled": false,
 }

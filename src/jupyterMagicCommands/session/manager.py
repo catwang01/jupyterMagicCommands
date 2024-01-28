@@ -20,4 +20,5 @@ class SessionManager:
         session = self.getSession(id)
         if session is None:
             session = retrieveSession()
+            self.sessions[id] = session
         return session

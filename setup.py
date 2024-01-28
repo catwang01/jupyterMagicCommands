@@ -21,5 +21,6 @@ setuptools.setup(
         "openai",
         "ipydrawio[all]",
         "urllib3==1.26.18",
+        "overrides"
     ],
 )

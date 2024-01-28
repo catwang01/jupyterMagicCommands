@@ -19,8 +19,9 @@ from jupyterMagicCommands.session import Session, SessionManager
 class PwshArgs:
     sessionId: str
 
-def pwsh(args: PwshArgs, outputter: AbstractOutputter, cell: str):
-    manager = SessionManager()
+manager = SessionManager()
+
+def pwsh(args: PwshArgs, manager: SessionManager, outputter: AbstractOutputter, cell: str):
     if sys.platform == 'win32':
         retriever = lambda : Session('powershell', outputter=outputter)
     else:
@@ -33,7 +34,7 @@ def pwsh(args: PwshArgs, outputter: AbstractOutputter, cell: str):
     with TemporaryDirectory() as tmpdirname:
         filePath = Path(os.path.join(tmpdirname, str(int(time.time())) + ".ps1"))
         filePath.write_text(cell, encoding=encoding)
-        session.invoke_command(str(filePath))
+        session.invoke_command('. '  + str(filePath))
 
 @magics_class
 class PowershellMagicCommand(Magics):
@@ -48,9 +49,9 @@ class PowershellMagicCommand(Magics):
     def pwsh(self, line, cell):
         args = parse_argstring(self.pwsh, line)
         outputterFactory = BasicFileSystemOutputterFactory(self.shell)
-        outputter = outputterFactory.create_outputter(True)
+        outputter = outputterFactory.create_outputter(False)
         # executeCmd(f'pwsh -NoProfile -File "{filePath}"')
-        pwsh(args, outputter, cell)
+        pwsh(args, manager, outputter, cell)
 
 def load_ipython_extension(ipython):
     ipython.register_magics(PowershellMagicCommand)
