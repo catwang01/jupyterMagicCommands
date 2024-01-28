@@ -7,7 +7,8 @@ setuptools.setup(
     author="ed",
     author_email="edwardelricwzx@example.com",
     description="Some useful magic commands for juypter",
-    packages=setuptools.find_packages(),
+    package_dir={"": "src"},
+    packages=["jupyterMagicCommands"],
     python_requires=">=3.8",
     install_requires=[
         "ipython",
@@ -19,6 +20,6 @@ setuptools.setup(
         "docker",
         "openai",
         "ipydrawio[all]",
-        "urllib3==1.26.18"
+        "urllib3==1.26.18",
     ],
 )
