@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,7 +21,10 @@ class PwshArgs:
 
 def pwsh(args: PwshArgs, outputter: AbstractOutputter, cell: str):
     manager = SessionManager()
-    retriever = lambda : Session('pwsh', outputter=outputter)
+    if sys.platform == 'win32':
+        retriever = lambda : Session('powershell', outputter=outputter)
+    else:
+        retriever = lambda : Session('pwsh', outputter=outputter)
     session = manager.getOrCreateSession(args.sessionId, retriever)
     if session is None:
         raise Exception(f"Can't initialize session with id '{args.sessionId}'")
