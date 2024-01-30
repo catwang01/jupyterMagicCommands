@@ -3,6 +3,7 @@ from abc import abstractmethod, ABCMeta
 
 
 class IFileSystem(metaclass=ABCMeta):
+
     @abstractmethod
     def exists(self, path: str) -> bool:
         pass

@@ -8,7 +8,7 @@ setuptools.setup(
     author_email="edwardelricwzx@example.com",
     description="Some useful magic commands for juypter",
     package_dir={"": "src"},
-    packages=["jupyterMagicCommands"],
+    packages=setuptools.find_packages("src"),
     python_requires=">=3.8",
     install_requires=[
         "ipython",
