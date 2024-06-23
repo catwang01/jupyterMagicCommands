@@ -18,7 +18,7 @@ setuptools.setup(
         "requests",
         "pytest",
         "docker",
-        "openai",
+        "openai==1.35.0",
         "ipydrawio[all]",
         "urllib3==1.26.18",
         "overrides"
