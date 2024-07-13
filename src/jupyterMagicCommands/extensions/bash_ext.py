@@ -16,6 +16,7 @@ from jupyterMagicCommands.extensions.constants import (
     EMPTY_CONTAINER_NAME,
     JUPYTER_MAGIC_COMMAND_BASH_CURRENT_CONTAINER,
 )
+from IPython.core.interactiveshell import InteractiveShell
 
 # The class MUST call this class decorator at creation time
 from jupyterMagicCommands.filesystem.filesystem_factory import FileSystemFactory
@@ -63,6 +64,7 @@ class BashArgsNS:
     outVar: Optional[str] = None
     interactive: bool = False
     proc: Optional[str] = None
+    expand: bool = False
 
 
 def initTerminal(initialOptions):
@@ -164,13 +166,6 @@ def executeCmd(command: str, args: BashArgsNS, **kwargs):
         raise NotValidBackend(f"Not a valid backend {backend}")
 
 
-def preprocessCommand(command: str, args: BashArgsNS) -> str:
-    """
-    Currently no preprocess is needed
-    """
-    return command
-
-
 def get_args(line: str) -> BashArgsNS:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -209,6 +204,7 @@ def get_args(line: str) -> BashArgsNS:
     )
     parser.add_argument("--logLevel", type=parse_logLevel, default="ERROR")
     parser.add_argument("--height", type=int, default=10)
+    parser.add_argument("--expand", action='store_true', default=False, help="Whether to expand variables using the scope in the user namespace")
     mg = parser.add_mutually_exclusive_group()
     mg.add_argument(
         "-i",
@@ -255,11 +251,12 @@ def get_args(line: str) -> BashArgsNS:
 
 
 class BashExtension:
-    def __init__(self, args: BashArgsNS, fs: IFileSystem, cell: str, logger: Logger):
+    def __init__(self, args: BashArgsNS, fs: IFileSystem, cell: str, logger: Logger, shell: Optional[InteractiveShell]=None):
         self.args = args
         self.fs = fs
         self.cell = cell
         self.logger = logger
+        self.shell = shell or get_ipython()
 
     def run(self) -> None:
         self.logger.setLevel(self.args.logLevel)
@@ -270,11 +267,17 @@ class BashExtension:
             self.logger.debug("Current dir: %s", self.fs.getcwd())
             self.logger.debug("The argument are %s", self.args)
 
-            command = preprocessCommand(self.cell, self.args)
+            command = self._preprocessCommand(self.cell)
             self._prepare(self.args, self.fs, self.logger)
             executeCmd(command, self.args, fs=self.fs, logger=self.logger)
         finally:
             self.fs.chdir(olddir)
+
+    def _preprocessCommand(self, command: str) -> str:
+        """
+        Currently no preprocess is needed
+        """
+        return self.shell.var_expand(command) if self.args.expand else command
 
     def _prepare(self, args: BashArgsNS, fs: IFileSystem, logger: Logger) -> None:
         folderExists = fs.exists(args.cwd)
@@ -311,13 +314,14 @@ class BashMagics(Magics):
     @suppress(Exception)
     def bash(self, line: str, cell: str):
         args = get_args(line)
+        shell = get_ipython()
         fs = FileSystemFactory.get_filesystem(
-            args.container, get_ipython(), global_logger
+            args.container, shell, global_logger
         )
         if fs is None:
             global_logger.error("Initialize a None FileSystem")
             return
-        bash = BashExtension(args, fs, cell, global_logger)
+        bash = BashExtension(args, fs, cell, global_logger, shell)
         bash.run()
 
 
