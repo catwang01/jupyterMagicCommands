@@ -1,5 +1,6 @@
 import logging
 import os
+from IPython import get_ipython
 import shutil
 import tempfile
 from typing import IO, Optional
@@ -19,9 +20,11 @@ class FileSystem(IFileSystem):
         self,
         outputterFactory: AbstractOutputterFactory,
         logger: logging.Logger = NULL_LOGGER,
+        shell = None
     ):
         self.logger = logger
         self.outputterFactory = outputterFactory
+        self.shell = shell or get_ipython()
 
     def exists(self, path: str) -> bool:
         return os.path.exists(path)
@@ -57,6 +60,7 @@ class FileSystem(IFileSystem):
         interactive: bool = False,
         outFile: Optional[str] = None,
         outVar: Optional[str] = None,
+        proc: Optional[str] = None,
     ) -> None:
         if outFile is not None and outVar is not None:
             raise Exception("outFile and outVar cannot be set at the same time")
@@ -72,16 +76,28 @@ class FileSystem(IFileSystem):
             actual_cmd_to_run = f"bash '{fp.name}'"
             logger.debug(actual_cmd_to_run)
 
-        if background and outFile is None and outVar is None:
-            outFile = "/tmp/out.log"
-            print(f"WARNING: outFile is not set, the default output file is {outFile}")
+        if background: 
+            # for background script, we use the built-in `%%script` magic to help
+            if outFile is None and outVar is None:
+                outFile = "/tmp/out.log"
+                print(f"WARNING: outFile is not set, the default output file is {outFile}")
+            actual_cmd_to_run += f'> "{outFile}" 2>&1'
+
+            # the process output is exported to the variable with name random_variable_name
+            random_variable_name = "outVar" + str(hash(outFile))
+            proc = proc or random_variable_name
+            self.shell.run_cell_magic("script", f"bash --bg --proc {proc}", actual_cmd_to_run)
+            child = self.shell.user_ns[proc]
+            pid = child.pid
+            self.shell.user_ns[proc] = pid
+            print(f"Run subprocess with pid: {pid}. Output to '{outFile}'")
+            return
+
         child = pexpect.spawn(actual_cmd_to_run)
         outputter = self.outputterFactory.create_outputter(interactive, outFile, outVar)
 
         outputter.register_read_callback(child.send)
         self._run_command(child, outputter)
-        if background:
-            print(f"Run subprocess with pid: {child.pid}. Output to '{outFile}'")
 
     def _run_command(self, child, outputter: AbstractOutputter):
         prevMessage = ""

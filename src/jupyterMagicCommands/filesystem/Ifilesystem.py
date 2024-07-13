@@ -40,5 +40,6 @@ class IFileSystem(metaclass=ABCMeta):
         interactive: bool = False,
         outFile: Optional[str] = None,
         outVar: Optional[str] = None,
+        proc: Optional[str] = None,
     ) -> None:
         pass

@@ -53,7 +53,6 @@ class BashArgsNS:
     init: bool = False
     cwd: str = "."
     create: bool = False
-    init: bool = False
     container: Optional[str] = None
     verbose: bool = False
     backend: str = "plain"
@@ -63,6 +62,7 @@ class BashArgsNS:
     outFile: Optional[str] = None
     outVar: Optional[str] = None
     interactive: bool = False
+    proc: Optional[str] = None
 
 
 def initTerminal(initialOptions):
@@ -95,13 +95,16 @@ def sendToTerminal(termName, displayHandler, message, prevMessage=None):
 def plainExecuteCommand(command: str, args: BashArgsNS, **kwargs):
     logger: Logger = kwargs.get("logger", NULL_LOGGER)
 
-    verbose, background, interactive, outFile, outVar = itemgetter(
-        "verbose", "background", "interactive", "outFile", "outVar"
+    verbose, background, interactive, outFile, outVar, proc = itemgetter(
+        "verbose", "background", "interactive", "outFile", "outVar", "proc"
     )(vars(args))
     logger.debug("### Parameters starts ###")
-    logger.debug(f"command: '{command}'")
-    logger.debug(f"verbose: '{verbose}'")
-    logger.debug(f"kwargs: '{kwargs}'")
+    logger.debug(f"{command =}'")
+    logger.debug(f"{verbose =}")
+    logger.debug(f"{kwargs =}")
+    logger.debug(f"{outFile =}")
+    logger.debug(f"{outVar =}")
+    logger.debug(f"{proc =}")
     logger.debug("### Parameters ends ###")
     if verbose:
         print(command)
@@ -112,6 +115,7 @@ def plainExecuteCommand(command: str, args: BashArgsNS, **kwargs):
             interactive=interactive,
             outFile=outFile,
             outVar=outVar,
+            proc=proc
         )
     else:
         raise Exception("FileSystem is not initliazed for a container!")
@@ -216,6 +220,7 @@ def get_args(line: str) -> BashArgsNS:
     mg.add_argument(
         "--bg", "--background", dest="background", action="store_true", default=False
     )
+    parser.add_argument("-proc", "--proc", type=str, help="Variable name which the process id will be saved into")
     outputMg = parser.add_mutually_exclusive_group()
     outputMg.add_argument(
         "--outfile", "--outFile", dest="outFile", type=str, default=None
@@ -242,6 +247,9 @@ def get_args(line: str) -> BashArgsNS:
         exit(-1)
     if args.init and not args.create:
         global_logger.error("--init can't be used without --create!")
+        exit(-1)
+    if not args.background and args.proc:
+        global_logger.error("--proc can only be used with --bg!")
         exit(-1)
     return args
 
