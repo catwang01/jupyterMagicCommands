@@ -190,6 +190,7 @@ rm -rf '{path}'
         interactive: bool = False,
         outFile: Optional[str] = None,
         outVar: Optional[str] = None,
+        proc: Optional[str] = None,
     ) -> None:
         if interactive and (outFile is not None or outVar is not None):
             raise Exception(

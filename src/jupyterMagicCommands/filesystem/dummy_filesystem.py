@@ -30,5 +30,6 @@ class DummyFileSystem(IFileSystem):
         interactive: bool = False,
         outFile: Optional[str] = None,
         outVar: Optional[str] = None,
+        proc: Optional[str] = None,
     ) -> None:
         pass
