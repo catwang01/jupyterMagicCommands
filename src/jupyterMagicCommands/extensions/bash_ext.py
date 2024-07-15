@@ -65,6 +65,7 @@ class BashArgsNS:
     interactive: bool = False
     proc: Optional[str] = None
     expand: bool = False
+    delay: int = -1
 
 
 def initTerminal(initialOptions):
@@ -97,8 +98,8 @@ def sendToTerminal(termName, displayHandler, message, prevMessage=None):
 def plainExecuteCommand(command: str, args: BashArgsNS, **kwargs):
     logger: Logger = kwargs.get("logger", NULL_LOGGER)
 
-    verbose, background, interactive, outFile, outVar, proc = itemgetter(
-        "verbose", "background", "interactive", "outFile", "outVar", "proc"
+    verbose, background, interactive, outFile, outVar, proc, delay = itemgetter(
+        "verbose", "background", "interactive", "outFile", "outVar", "proc", "delay"
     )(vars(args))
     logger.debug("### Parameters starts ###")
     logger.debug(f"{command =}'")
@@ -107,6 +108,7 @@ def plainExecuteCommand(command: str, args: BashArgsNS, **kwargs):
     logger.debug(f"{outFile =}")
     logger.debug(f"{outVar =}")
     logger.debug(f"{proc =}")
+    logger.debug(f"{delay =}")
     logger.debug("### Parameters ends ###")
     if verbose:
         print(command)
@@ -117,7 +119,8 @@ def plainExecuteCommand(command: str, args: BashArgsNS, **kwargs):
             interactive=interactive,
             outFile=outFile,
             outVar=outVar,
-            proc=proc
+            proc=proc,
+            delay=delay,
         )
     else:
         raise Exception("FileSystem is not initliazed for a container!")
@@ -205,6 +208,12 @@ def get_args(line: str) -> BashArgsNS:
     parser.add_argument("--logLevel", type=parse_logLevel, default="ERROR")
     parser.add_argument("--height", type=int, default=10)
     parser.add_argument("--expand", action='store_true', default=False, help="Whether to expand variables using the scope in the user namespace")
+    parser.add_argument(
+        '--wait-after', '--delay', type=int, dest='delay', default=-1,
+        help="""Wait the background process after a certain number of seconds.
+        It's useful when running a background process inside a background process.
+        """,
+    )
     mg = parser.add_mutually_exclusive_group()
     mg.add_argument(
         "-i",

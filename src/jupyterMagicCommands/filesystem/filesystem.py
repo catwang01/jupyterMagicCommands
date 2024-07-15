@@ -61,6 +61,7 @@ class FileSystem(IFileSystem):
         outFile: Optional[str] = None,
         outVar: Optional[str] = None,
         proc: Optional[str] = None,
+        delay: int = -1,
     ) -> None:
         if outFile is not None and outVar is not None:
             raise Exception("outFile and outVar cannot be set at the same time")
@@ -86,7 +87,7 @@ class FileSystem(IFileSystem):
             # the process output is exported to the variable with name random_variable_name
             random_variable_name = "outVar" + str(hash(outFile))
             proc = proc or random_variable_name
-            self.shell.run_cell_magic("script", f"bash --bg --proc {proc}", actual_cmd_to_run)
+            self.shell.run_cell_magic("_script", f"bash --bg --proc {proc} --wait-after {delay}", actual_cmd_to_run)
             child = self.shell.user_ns[proc]
             pid = child.pid
             self.shell.user_ns[proc] = pid

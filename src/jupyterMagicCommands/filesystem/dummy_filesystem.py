@@ -31,5 +31,6 @@ class DummyFileSystem(IFileSystem):
         outFile: Optional[str] = None,
         outVar: Optional[str] = None,
         proc: Optional[str] = None,
+        delay: int = -1,
     ) -> None:
         pass

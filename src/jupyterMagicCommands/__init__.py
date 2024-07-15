@@ -10,10 +10,12 @@ if IS_IN_JUPYTER:
     from .extensions import cs_ext
     from .extensions import ai_ext
     from .extensions import drawio_ext
+    from .extensions import _script_ext
     from .version import version
 
     def load_ipython_extension(ipython):
         for module in [
+            _script_ext,
             bash_ext,
             clickhouse_ext,
             plantuml_ext,
@@ -21,6 +23,6 @@ if IS_IN_JUPYTER:
             pwsh_ext,
             cs_ext,
             ai_ext,
-            drawio_ext,
+            drawio_ext
         ]:
             module.load_ipython_extension(ipython)
