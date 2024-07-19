@@ -35,7 +35,7 @@ def get_args(line: str):
                         )
     parser.add_argument('-a', '--append', action='store_true', default=False)
     parser.add_argument('-f', '--force', action='store_true', default=False)
-    parser.add_argument('-d', '--directory', default=None)
+    parser.add_argument('-d', '--directory', default='.')
     parser.add_argument('-l', '--logLevel', choices=[DEBUG, INFO, ERROR], default=INFO)
     args = parser.parse_args(line.strip(' ').split(' '))
     logger.setLevel(args.logLevel)
@@ -52,21 +52,22 @@ def _writefile(text: str, args: Namespace, fs: IFileSystem) -> None:
     mode = 'w'
     if args.append:
         mode = 'a'
+    message: str = ""
     if fs.exists(filePath):
         if args.append:
-            log = f"Appending {filePath}"
+            message = f"Appending {filePath}"
         else:
-            log = f'Overwriting {filePath}'  
+            message = f'Overwriting {filePath}'  
     else:
         if args.append:
             print(f"Trying to append to a non-existing file {filePath}. Can't write such file!")
             return
         else:
-            log = f'Writing {filePath}'
+            message = f'Writing {filePath}'
     
     with fs.open(filePath, mode, encoding='utf8') as f:
         f.write(text)
-    print(log)
+    if message: print(message)
 
 def writefile(line, cell):
     sio = StringIO(cell)

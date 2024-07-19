@@ -1,6 +1,7 @@
 from typing import IO, Optional
 from abc import abstractmethod, ABCMeta
 
+
 class IFileSystem(metaclass=ABCMeta):
 
     @abstractmethod
@@ -24,9 +25,21 @@ class IFileSystem(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def removedirs(self, path: str) -> None:
+    def remove(self, path: str) -> None:
         pass
 
     @abstractmethod
-    def system(self, cmd: str, background: bool=False, interactive: bool=False, outFile: Optional[str]=None) -> None:
+    def is_dir(self, path: str) -> bool:
+        pass
+
+    @abstractmethod
+    def system(
+        self,
+        cmd: str,
+        background: bool = False,
+        interactive: bool = False,
+        outFile: Optional[str] = None,
+        outVar: Optional[str] = None,
+        proc: Optional[str] = None,
+    ) -> None:
         pass

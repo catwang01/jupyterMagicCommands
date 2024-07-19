@@ -1,98 +1,84 @@
-from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
-import docker
-import pytest
-from jupyterMagicCommands.filesystem.docker import DockerFileSystem
-
-@pytest.fixture(scope="class")
-def client():
-    client = docker.from_env()
-    return client
-
-@pytest.fixture(scope="class")
-def container(client):
-    containerName = "test"
-    try:
-        newContainer = client.containers.get(containerName)
-    except docker.errors.NotFound:
-        newContainer = client.containers.run('bash', name=containerName, stdin_open=True, detach=True, remove=True)
-    yield newContainer 
-    newContainer.stop()
-
-@pytest.fixture
-def dockerfilesystem(container) -> IFileSystem:
-    fs = DockerFileSystem(container)
-    return fs
-
 class TestDockerFileSystem:
+    def test_if_default_shell_can_be_detect_correctly(self, container, dockerfs):
+        if container.name == "dind-test":
+            assert dockerfs.default_shell == "sh"
+        else:
+            assert dockerfs.default_shell == "bash"
 
-    def test_if_default_shell_can_be_detect_correctly(self, dockerfilesystem):
-        assert dockerfilesystem.default_shell == "bash"
+    def test_check_whether_file_exists_in_container(self, tmp_path, dockerfs):
+        path = f"{tmp_path}/a/b/c"
+        dockerfs.makedirs(path)
+        assert dockerfs.exists(path) == True
 
-    def test_check_whether_file_exists_in_container(self, tmp_path, dockerfilesystem):
-        path = f'{tmp_path}/a/b/c'
-        dockerfilesystem.makedirs(path)
-        assert dockerfilesystem.exists(path) == True
+    def test_write_file_to_container(self, tmp_path, container, dockerfs):
+        path = f"/{tmp_path}/app/a/b/c/test.txt"
+        with dockerfs.open(path, "w", encoding="utf8") as f:
+            f.write("hello")
+            f.write("hello")
 
-    def test_write_file_to_container(self, tmp_path, container, dockerfilesystem):
-        path = f'/{tmp_path}/app/a/b/c/test.txt'
-        with dockerfilesystem.open(path, 'w', encoding='utf8') as f:
-            f.write('hello')
-            f.write('hello')
-        
-        assert dockerfilesystem.exists(path)
-        assert container.exec_run(f'cat {path}').output.decode() == "hellohello"
+        assert dockerfs.exists(path)
+        assert container.exec_run(f"cat {path}").output.decode() == "hellohello"
 
-    def test_chdir_and_getcwd_in_container(self, tmp_path, dockerfilesystem):
-        path = f'{tmp_path}/test'
-        assert dockerfilesystem.getcwd() == '/'
+    def test_chdir_and_getcwd_in_container(self, tmp_path, dockerfs):
+        path = f"{tmp_path}/test"
+        assert dockerfs.getcwd() == "/"
 
-        dockerfilesystem.makedirs(path)
-        assert dockerfilesystem.exists(path) == True
+        dockerfs.makedirs(path)
+        assert dockerfs.exists(path) == True
 
-        dockerfilesystem.chdir(path)
-        assert dockerfilesystem.getcwd() == path
+        dockerfs.chdir(path)
+        assert dockerfs.getcwd() == path
 
-    def test_chdir_to_relative_path_and_getcwd_in_container(self, tmp_path, dockerfilesystem):
-        path = f'{tmp_path}/test'
-        assert dockerfilesystem.getcwd() == '/'
+    def test_chdir_to_relative_path_and_getcwd_in_container(self, tmp_path, dockerfs):
+        dockerfs.chdir("/")
 
-        dockerfilesystem.makedirs(path)
-        assert dockerfilesystem.exists(path) == True
+        path = f"{tmp_path}/test"
+        assert dockerfs.getcwd() == "/"
 
-        dockerfilesystem.chdir(path)
-        assert dockerfilesystem.getcwd() == path
+        dockerfs.makedirs(path)
+        assert dockerfs.exists(path) == True
 
-        path2 = f'{tmp_path}/hello/world'
-        dockerfilesystem.makedirs(path2)
-        assert dockerfilesystem.exists(path2) == True
+        dockerfs.chdir(path)
+        assert dockerfs.getcwd() == path
 
-        dockerfilesystem.chdir(path2)
-        assert dockerfilesystem.getcwd() == path2
+        path2 = f"{tmp_path}/hello/world"
+        dockerfs.makedirs(path2)
+        assert dockerfs.exists(path2) == True
 
-    def test_removedirs_in_container(self, tmp_path, dockerfilesystem):
-        path = f'{tmp_path}/app/a/b/c/test.txt'
+        dockerfs.chdir(path2)
+        assert dockerfs.getcwd() == path2
 
-        assert dockerfilesystem.exists(path) == False
+    def test_remove_in_container(self, tmp_path, dockerfs):
+        path = f"{tmp_path}/app/a/b/c/test.txt"
 
-        with dockerfilesystem.open(path, 'w', encoding='utf8') as f:
-            f.write('hello')
-            f.write('hello')
-        assert dockerfilesystem.exists(path) == True
+        assert dockerfs.exists(path) == False
 
-        dockerfilesystem.removedirs(path)
-        assert dockerfilesystem.exists(path) == False
+        with dockerfs.open(path, "w", encoding="utf8") as f:
+            f.write("hello")
+            f.write("hello")
+        assert dockerfs.exists(path) == True
 
-    def test_file_append(self, tmp_path, container, dockerfilesystem):
-        path = f'{tmp_path}/test.txt'
+        dockerfs.remove(path)
+        assert dockerfs.exists(path) == False
 
-        with dockerfilesystem.open(path, 'w', encoding='utf8') as f:
-            f.write('hello')
-        assert container.exec_run(f'cat {path}').output.decode() == "hello"
+    def test_file_append(self, tmp_path, container, dockerfs):
+        path = f"{tmp_path}/test.txt"
 
-        with dockerfilesystem.open(path, 'a', encoding='utf8') as f:
-            f.write(' world')
-        assert container.exec_run(f'cat {path}').output.decode() == "hello world"
+        with dockerfs.open(path, "w", encoding="utf8") as f:
+            f.write("hello")
+        assert container.exec_run(f"cat {path}").output.decode() == "hello"
 
-        with dockerfilesystem.open(path, 'r', encoding='utf8') as f:
+        with dockerfs.open(path, "a", encoding="utf8") as f:
+            f.write(" world")
+        assert container.exec_run(f"cat {path}").output.decode() == "hello world"
+
+        with dockerfs.open(path, "r", encoding="utf8") as f:
             s = f.read()
         assert s == "hello world"
+
+    def test_copy_to_container(self, tmp_path, dockerfs):
+        p = str(tmp_path / "test.txt")
+        with open(p, "w", encoding="utf8") as f:
+            f.write("hello world")
+        dockerfs.copy_to_container(p, p)
+        assert dockerfs.exists(p)
