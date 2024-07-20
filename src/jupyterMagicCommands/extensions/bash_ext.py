@@ -286,7 +286,15 @@ class BashExtension:
         """
         Currently no preprocess is needed
         """
-        return self.shell.var_expand(command) if self.args.expand else command
+        if not self.args.expand:
+            return command
+
+        modified_command = os.linesep.join(
+            [self.shell.var_expand(line) for line in command.splitlines()]
+        )
+        self.logger.info(f"Command before preprocessing: {command=}")
+        self.logger.info(f"Command after preprocessing: {modified_command=}")
+        return modified_command
 
     def _prepare(self, args: BashArgsNS, fs: IFileSystem, logger: Logger) -> None:
         folderExists = fs.exists(args.cwd)
