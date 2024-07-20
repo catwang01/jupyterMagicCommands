@@ -209,9 +209,10 @@ def get_args(line: str) -> BashArgsNS:
     parser.add_argument("--height", type=int, default=10)
     parser.add_argument("--expand", action='store_true', default=False, help="Whether to expand variables using the scope in the user namespace")
     parser.add_argument(
-        '--wait-after', '--delay', type=int, dest='delay', default=-1,
+        '--wait-after', '--delay', type=int, dest='delay', default=300,
         help="""Wait the background process after a certain number of seconds.
         It's useful when running a background process inside a background process.
+        By default, we'll check the status of the background process after 300s.
         """,
     )
     mg = parser.add_mutually_exclusive_group()
