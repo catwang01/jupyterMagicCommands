@@ -6,7 +6,6 @@ from jupyterMagicCommands.utils.drawio import drawio_image
 
 @magic_arguments()
 @argument('-p', '--page', type=str, help="Page name to show")
-@argument('-f', '--format', choices=['svg', 'drawio'], default='drawio', help="Format to show")
 @argument('--height', type=lambda x: str(x) + "px", default="500", help="Height")
 @register_line_magic
 def drawio(line):
