@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 import logging
 
-from IPython.testing.globalipapp import get_ipython
 from jupyterMagicCommands.utils.action_detector import ActionDetector
 
 class TestObj:
