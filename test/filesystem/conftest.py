@@ -9,7 +9,6 @@ from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.outputters import (BasicFileSystemOutputterFactory,
                                              DockerFileSystemOutputterFactory)
 
-
 @pytest.fixture(scope="module")
 def client():
     client = docker.from_env()
@@ -39,7 +38,6 @@ def container(client, request):
         )
     yield newContainer
     # newContainer.stop()
-
 
 @pytest.fixture(scope="module")
 def ipython_shell() -> InteractiveShell:
