@@ -12,12 +12,13 @@ from subprocess import CalledProcessError
 from threading import Thread
 from typing import Optional
 
-from traitlets import Any, Dict, List, default
-
 from IPython.core import magic_arguments
 from IPython.core.async_helpers import _AsyncIOProxy
 from IPython.core.magic import Magics, cell_magic, line_magic, magics_class
 from IPython.utils.process import arg_split
+from traitlets import Any, Dict, List, default
+
+from jupyterMagicCommands.utils.action_detector import ActionDetector
 
 #-----------------------------------------------------------------------------
 # Magic implementation classes
@@ -188,7 +189,9 @@ class MyScriptMagics(Magics):
 
     async def _readchunk(self, stream):
         try:
-            return await stream.readuntil(b"\n")
+            s = await stream.readuntil(b"\n")
+            ActionDetector.detect_action_by_line(s.decode("utf8", errors="replace"))
+            return s
         except asyncio.exceptions.IncompleteReadError as e:
             return e.partial
         except asyncio.exceptions.LimitOverrunError as e:

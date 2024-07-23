@@ -1,16 +1,17 @@
 import logging
 import os
-import psutil
-from IPython import get_ipython
 import shutil
 import tempfile
 from typing import IO, Optional
 
 import pexpect
+import psutil
+from IPython import get_ipython
 
 from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.outputters import (AbstractOutputter,
                                              AbstractOutputterFactory)
+from jupyterMagicCommands.utils.action_detector import ActionDetector
 from jupyterMagicCommands.utils.log import NULL_LOGGER
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class FileSystem(IFileSystem):
         self.logger = logger
         self.outputterFactory = outputterFactory
         self.shell = shell or get_ipython()
+        self._actionDetector = ActionDetector(self.logger, self.shell)
 
     def exists(self, path: str) -> bool:
         return os.path.exists(path)
@@ -131,17 +133,19 @@ class FileSystem(IFileSystem):
 
     def _run_command(self, child, outputter: AbstractOutputter):
         prevMessage = ""
+        i = 0
         while True:
             try:
-                i = child.expect_list(
+                returncode = child.expect_list(
                     [pexpect.TIMEOUT, pexpect.EOF],
                     timeout=0.01,
                 )  # fresh terminal per 0.2s
                 message = child.before.decode()
+                i = self._actionDetector.detect_action_by_chunk(message, i)
                 outputter.write(message[len(prevMessage) :])
                 outputter.handle_read()
                 prevMessage = message
-                if i != 0:
+                if returncode != 0:
                     break
             except KeyboardInterrupt:
                 child.sendintr()
