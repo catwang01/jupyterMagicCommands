@@ -53,14 +53,14 @@ class FileSystem(IFileSystem):
         else:
             raise Exception(f"Path '{path}' does not exist")
 
-    def _find_pid(self, actual_cmd_without_redirections: str) -> Optional[int]:
+    def _find_pid(self, cmd: str) -> Optional[int]:
         # we use the true pid
         processes = psutil.process_iter(attrs=["pid", "name", "cmdline"])
         for p in processes:
             command = " ".join(p.cmdline())
             self.logger.debug(f'The process {p} has the command {command}')
             # the correctness is built on the assumption that the template file saving the cell content is only run by this class
-            if command and actual_cmd_without_redirections == command:
+            if command and cmd == command:
                 self.logger.info(f"Find a process: {p.info}")
                 return p.pid
         return None
@@ -77,20 +77,18 @@ class FileSystem(IFileSystem):
         if outFile is None and outVar is None:
             outFile = "/tmp/out.log"
             print(f"WARNING: outFile is not set, the default output file is {outFile}")
-        actual_cmd_without_redirections = actual_cmd
-        actual_cmd += f'> "{outFile}" 2>&1'
 
         # the process output is exported to the variable with name random_variable_name
         random_variable_name = "outVar" + str(hash(outFile))
         proc = proc or random_variable_name
-        self.shell.run_cell_magic("_script", f"bash --bg --proc {proc} --wait-after {delay}", actual_cmd)
+        self.shell.run_cell_magic("_script", f"bash --bg --outfile {outFile} --proc {proc} --wait-after {delay}", actual_cmd)
         self.shell.system(f'ps aux | grep -v grep | grep "{actual_cmd}"')
-        pid = self._find_pid(actual_cmd_without_redirections)
+        pid = self._find_pid(actual_cmd)
         # if the true pic can't be obtained, use the parent pid
         if pid is not None:
             print(f"Run a subprocess with pid: {pid}. Output to '{outFile}'")
         else:
-            self.logger.info(f'Not process with command {actual_cmd_without_redirections} is found. Use the the pid of the parent process')
+            self.logger.info(f'Not process with command {actual_cmd} is found. Use the the pid of the parent process')
             child = self.shell.user_ns[proc]
             pid = child.pid
             print(f"Run a subprocess. Its parent process's pid is {pid}. Output to '{outFile}'")

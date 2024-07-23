@@ -10,6 +10,7 @@ import sys
 import time
 from subprocess import CalledProcessError
 from threading import Thread
+from typing import Optional
 
 from traitlets import Any, Dict, List, default
 
@@ -62,6 +63,12 @@ def script_args(f):
             '--wait-after', '--delay', type=int, dest='delay', default=-1,
             help="""Wait the background process after a certain number of seconds.
             It's useful when running a background process inside a background process.
+            """,
+        ),
+
+        magic_arguments.argument(
+            '--outfile', '--outFile', type=str, dest='outFile', default=None,
+            help="""Output file
             """,
         ),
     ]
@@ -167,6 +174,25 @@ class MyScriptMagics(Magics):
         """.format(**locals())
         
         return named_script_magic
+
+    async def _handle_stream(self, stream, stream_arg, file_object):
+        while True:
+            chunk = (await self._readchunk(stream)).decode("utf8", errors="replace")
+            if not chunk:
+                break
+            if stream_arg:
+                self.shell.user_ns[stream_arg] = chunk
+            else:
+                file_object.write(chunk)
+                file_object.flush()
+
+    async def _readchunk(self, stream):
+        try:
+            return await stream.readuntil(b"\n")
+        except asyncio.exceptions.IncompleteReadError as e:
+            return e.partial
+        except asyncio.exceptions.LimitOverrunError as e:
+            return await stream.read(e.consumed)
     
     @magic_arguments.magic_arguments()
     @script_args
@@ -213,33 +239,14 @@ class MyScriptMagics(Magics):
             """Call a coroutine on the asyncio thread"""
             return asyncio.run_coroutine_threadsafe(coro, event_loop).result()
 
-        async def _readchunk(stream):
-            try:
-                return await stream.readuntil(b"\n")
-            except asyncio.exceptions.IncompleteReadError as e:
-                return e.partial
-            except asyncio.exceptions.LimitOverrunError as e:
-                return await stream.read(e.consumed)
-
-        async def _handle_stream(stream, stream_arg, file_object):
-            while True:
-                chunk = (await _readchunk(stream)).decode("utf8", errors="replace")
-                if not chunk:
-                    break
-                if stream_arg:
-                    self.shell.user_ns[stream_arg] = chunk
-                else:
-                    file_object.write(chunk)
-                    file_object.flush()
-
         async def _stream_communicate(process, cell):
             process.stdin.write(cell)
             process.stdin.close()
             stdout_task = asyncio.create_task(
-                _handle_stream(process.stdout, args.out, sys.stdout)
+                self._handle_stream(process.stdout, args.out, sys.stdout)
             )
             stderr_task = asyncio.create_task(
-                _handle_stream(process.stderr, args.err, sys.stderr)
+                self._handle_stream(process.stderr, args.err, sys.stderr)
             )
             await asyncio.wait([stdout_task, stderr_task])
             await process.wait()
@@ -270,16 +277,17 @@ class MyScriptMagics(Magics):
             self.bg_processes.append(p)
             self._gc_bg_processes()
             to_close = []
-            if args.out:
-                self.shell.user_ns[args.out] = _AsyncIOProxy(p.stdout, event_loop)
-            else:
-                to_close.append(p.stdout)
-            if args.err:
-                self.shell.user_ns[args.err] = _AsyncIOProxy(p.stderr, event_loop)
-            else:
-                to_close.append(p.stderr)
+            if args.outFile is None:
+                if args.out:
+                    self.shell.user_ns[args.out] = _AsyncIOProxy(p.stdout, event_loop)
+                else:
+                    to_close.append(p.stdout)
+                if args.err:
+                    self.shell.user_ns[args.err] = _AsyncIOProxy(p.stderr, event_loop)
+                else:
+                    to_close.append(p.stderr)
             event_loop.call_soon_threadsafe(
-                lambda: asyncio.Task(self._run_script(p, cell, to_close, args.delay))
+                lambda: asyncio.Task(self._run_script(p, cell, to_close, args.delay, args.outFile))
             )
             if args.proc:
                 proc_proxy = _AsyncIOProxy(p, event_loop)
@@ -319,20 +327,30 @@ class MyScriptMagics(Magics):
 
     shebang.__skip_doctest__ = os.name != "posix"
 
-    async def _run_script(self, p, cell, to_close, delay):
+    async def _run_script(self, p, cell: str, to_close: list, delay: int, outFile: Optional[str]=None):
         """callback for running the script in the background"""
-
         p.stdin.write(cell)
         await p.stdin.drain()
         p.stdin.close()
         await p.stdin.wait_closed()
         if delay > 0:
             await asyncio.sleep(delay)
-        await p.wait()
-        # asyncio read pipes have no close
-        # but we should drain the data anyway
-        for s in to_close:
-            await s.read()
+        if outFile is not None:
+            with open(outFile, 'w') as f:
+                stdout_task = asyncio.create_task(
+                    self._handle_stream(p.stdout, f, sys.stdout)
+                )
+                stderr_task = asyncio.create_task(
+                    self._handle_stream(p.stderr, f, sys.stderr)
+                )
+                await asyncio.wait([stdout_task, stderr_task])
+                await p.wait()
+        else:
+            await p.wait()
+            # asyncio read pipes have no close
+            # but we should drain the data anyway
+            for s in to_close:
+                await s.read()
         self._gc_bg_processes()
 
     @line_magic("_killbgscripts")
