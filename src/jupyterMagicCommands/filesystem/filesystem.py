@@ -84,7 +84,6 @@ class FileSystem(IFileSystem):
         random_variable_name = "outVar" + str(hash(outFile))
         proc = proc or random_variable_name
         self.shell.run_cell_magic("_script", f"bash --bg --outfile {outFile} --proc {proc} --wait-after {delay}", actual_cmd)
-        self.shell.system(f'ps aux | grep -v grep | grep "{actual_cmd}"')
         pid = self._find_pid(actual_cmd)
         # if the true pic can't be obtained, use the parent pid
         if pid is not None:
