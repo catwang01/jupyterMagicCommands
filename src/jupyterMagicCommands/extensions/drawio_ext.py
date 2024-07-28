@@ -14,7 +14,7 @@ logger = getLogger(__name__)
 @argument('-p', '--page', type=str, required=True, help="Page name to show, case-sensitive")
 @argument('--url', type=str, default=os.getenv("JMC_JUPYTER_BASE_URL"), help="Base url of the jupyterlab")
 @argument('--password', type=str, default=os.getenv("JMC_JUPYTER_PASSWORD"), help="Password of the jupyterlab")
-@argument("--logLevel", type=parse_logLevel, default="ERROR", choice=["ERROR", "DEBUG", "INFO"])
+@argument("--logLevel", type=parse_logLevel, default="ERROR", choices=["ERROR", "DEBUG", "INFO"])
 @register_line_magic
 def drawio(line):
     args = parse_argstring(drawio, line)
