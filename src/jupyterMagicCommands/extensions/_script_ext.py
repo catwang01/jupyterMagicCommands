@@ -138,6 +138,7 @@ class MyScriptMagics(Magics):
     
     def __init__(self, shell=None):
         super(MyScriptMagics, self).__init__(shell=shell)
+        self.actionDetector = ActionDetector()
         self._generate_script_magics()
         self.bg_processes = []
         atexit.register(self.kill_bg_processes)
@@ -190,7 +191,7 @@ class MyScriptMagics(Magics):
     async def _readchunk(self, stream):
         try:
             s = await stream.readuntil(b"\n")
-            ActionDetector.detect_action_by_line(s.decode("utf8", errors="replace"))
+            self.actionDetector.detect_action_by_line(s.decode("utf8", errors="replace"))
             return s
         except asyncio.exceptions.IncompleteReadError as e:
             return e.partial
