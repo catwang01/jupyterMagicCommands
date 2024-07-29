@@ -18,9 +18,6 @@ logger = getLogger(__name__)
 @register_line_magic
 def drawio(line):
     args = parse_argstring(drawio, line)
-    display_options = {
-        'height': args.height
-    }
     if not args.url:
         raise Exception("You need to set the base url by --url option or JMC_JUPYTER_BASE_URL environment variable")
     if not args.password:
@@ -32,7 +29,7 @@ def drawio(line):
         logger=logger
     )
     drawioObj = DrawIO(jupyter_client, logger)
-    drawioObj.drawio_image(args.page, display_options)
+    drawioObj.drawio_image(args.page)
 
 def load_ipython_extension(ipython):
     ipython.register_magic_function(drawio, 'line')
