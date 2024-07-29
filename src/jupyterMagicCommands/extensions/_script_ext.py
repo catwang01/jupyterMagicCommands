@@ -342,10 +342,10 @@ class MyScriptMagics(Magics):
         if outFile is not None:
             with open(outFile, 'w') as f:
                 stdout_task = asyncio.create_task(
-                    self._handle_stream(p.stdout, f, sys.stdout)
+                    self._handle_stream(p.stdout, None, f)
                 )
                 stderr_task = asyncio.create_task(
-                    self._handle_stream(p.stderr, f, sys.stderr)
+                    self._handle_stream(p.stderr, None, f)
                 )
                 await asyncio.wait([stdout_task, stderr_task])
                 await p.wait()
