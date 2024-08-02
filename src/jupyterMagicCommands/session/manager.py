@@ -1,8 +1,8 @@
-from typing import Callable, Dict, Optional, TypeAlias
+from typing import Callable, Dict, Optional
 from jupyterMagicCommands.session import Session
 
-SessionID: TypeAlias = str
-SessionDict: TypeAlias = Dict[SessionID, Session]
+SessionID = str
+SessionDict = Dict[SessionID, Session]
 SessionRetriever = Callable[[], Session]
 
 class SessionManager:
