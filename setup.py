@@ -22,6 +22,15 @@ setuptools.setup(
         "ipydrawio[all]",
         "urllib3==1.26.18",
         "overrides",
-        "psutil"
+        "psutil",
+        "retrying",
+        "ipylab",
+        "ipykernel"
     ],
+    extra_requires={
+        'dev': [
+            'pytest',
+            'pytest-param-files'
+        ]
+    }
 )
