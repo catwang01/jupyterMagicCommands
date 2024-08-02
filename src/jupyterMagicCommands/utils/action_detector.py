@@ -1,14 +1,17 @@
+import logging
 import re
 from typing import Optional
 
 from IPython import get_ipython
 from IPython.core.interactiveshell import InteractiveShell
 
+from jupyterMagicCommands.utils.log import NULL_LOGGER
+
 
 class ActionDetector:
 
-    def __init__(self, logger, shell: Optional[InteractiveShell] = None):
-        self.logger = logger
+    def __init__(self, logger: Optional[logging.Logger]=None, shell: Optional[InteractiveShell] = None):
+        self.logger = logger or NULL_LOGGER
         self.shell = shell or get_ipython()
 
     def detect_action_by_line(self, line: str) -> None:
