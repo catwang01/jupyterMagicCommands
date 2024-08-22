@@ -1,7 +1,7 @@
 [name1] description
 .
 {
-    "line": "##jmc[action.setvariable test1]hello",
+    "line": "##jmc[action.setvariable variable=test1]hello",
     "variable": "test1"
 }
 .
@@ -11,7 +11,7 @@ hello
 [name2]  Unrelated leading characters disable the detection
 .
 { 
-    "line": " ##jmc[action.setvariable test2]hello",
+    "line": " ##jmc[action.setvariable variable=test2]hello",
     "variable": "test2"
 }
 .
@@ -21,7 +21,7 @@ None
 [name3]  Unrelated leading characters disable the detection
 .
 { 
-    "line": "hello world ##jmc[action.setvariable test2]hello world",
+    "line": "hello world ##jmc[action.setvariable variable=test2]hello world",
     "variable": "test2"
 }
 .
@@ -31,7 +31,7 @@ None
 [name4]  All the content after ] is considered as the value
 .
 { 
-    "line": "##jmc[action.setvariable test2]hello world what's your name",
+    "line": "##jmc[action.setvariable variable=test2]hello world what's your name",
     "variable": "test2"
 }
 .
@@ -41,7 +41,7 @@ hello world what's your name
 [name6]  Only the first line will be used to detect if multiple lines are present
 .
 { 
-    "line": "##jmc[action.setvariable test2]hello world what's your name\nwhat's your name",
+    "line": "##jmc[action.setvariable variable=test2]hello world what's your name\nwhat's your name",
     "variable": "test2"
 }
 .
@@ -51,7 +51,7 @@ hello world what's your name
 [name7]  Only the first line will be used to detect if multiple lines are present
 .
 { 
-    "line": "\n##jmc[action.setvariable test2]hello world what's your name",
+    "line": "\n##jmc[action.setvariable variable=test2]hello world what's your name",
     "variable": "test2"
 }
 .

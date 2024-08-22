@@ -1,7 +1,7 @@
 [name1] description
 .
 {
-    "chunk": "##jmc[action.setvariable test2]hello2\n##jmc[action.setvariable test3]hello",
+    "chunk": "##jmc[action.setvariable variable=test2]hello2\n##jmc[action.setvariable variable=test3]hello",
     "i": 0
 }
 .
@@ -9,32 +9,32 @@
     "ns": {
         "test2": "hello2"
     },
-    "j": 38
+    "j": 47
 }
 .
 
 [name2] description
 .
 {
-    "chunk": "##jmc[action.setvariable test4]hello4\n##jmc[action.setvariable test5]hello5",
+    "chunk": "##jmc[action.setvariable variable=test4]hello4\n##jmc[action.setvariable variable=test5]hello5",
     "i": 1
 }
 .
 {
     "ns": {},
-    "j": 38
+    "j": 47
 }
 .
 
 [name3] description
 .
 {
-    "chunk": "##jmc[action.setvariable test4]hello4\n##jmc[action.setvariable test5]hello5",
+    "chunk": "##jmc[action.setvariable variable=test4]hello4\n##jmc[action.setvariable variable=test5]hello5",
     "i": 1
 }
 .
 {
     "ns": {},
-    "j": 38
+    "j": 47
 }
 .

@@ -19,7 +19,7 @@ class ActionDetector:
         if i != -1:
             self.logger.error("Multiple lines detected, only the first line will be used. If you want to detect action in multiple lines, use detect_action_by_chunk instead")
             line = line[:i]
-        template = r"^##jmc\[action.setvariable (?P<variable>.*?)\](?P<value>.*)(\r)?$"
+        template = r"^##jmc\[action.setvariable variable=(?P<variable>.*?)\](?P<value>.*)(\r)?$"
         self.logger.debug("Detecting action from line")
         self.logger.debug(f"{line=}")
         ret = re.search(template, line)
