@@ -1,3 +1,4 @@
+from enum import Enum
 import logging
 from typing import Optional
 
@@ -12,7 +13,7 @@ class LoggingCommandTransformer(Transformer):
     def start(self, children):
         parameters = children[1] if children[1] else []
         return {
-            "task_name": children[0],
+            "action_name": children[0],
             "parameters":  {
                 parameter["parameter_name"]: parameter["parameter_value"] 
                     for parameter in parameters
@@ -20,7 +21,7 @@ class LoggingCommandTransformer(Transformer):
             "value": children[2] if len(children) == 3 and children[2] else None
         }
     
-    def task_name(self, children):
+    def action_name(self, children):
         return ".".join(children)
     
     def ANYCONTENT(self, item):
@@ -39,13 +40,16 @@ class LoggingCommandTransformer(Transformer):
         return "".join(children)
 
 
+class LoggingCommandAction(Enum):
+    ACTION_SETVARIABLE = "action.setvariable"
+
 class LoggingCommandParser:
 
     def __init__(self):
         self._parser = Lark(r"""
-            start: "##jmc[" task_name parameter_assignments? "]" logging_command_value
+            start: "##jmc[" action_name parameter_assignments? "]" logging_command_value
             
-            task_name: IDENTIFIER ("." IDENTIFIER)*
+            action_name: IDENTIFIER ("." IDENTIFIER)*
             
             parameter_assignments: single_parameter_assignment (";" single_parameter_assignment)*
             
@@ -88,8 +92,11 @@ class ActionDetector:
         self.logger.debug(f"{line=}")
         try:
             logging_command = self._logging_command_parser.parse(line)
-        except Exception as e:
-            self.logger.error(f"Can't parse action from the line")
+        except Exception:
+            self.logger.warn(f"Can't parse action from the line")
+            return
+        if LoggingCommandAction.ACTION_SETVARIABLE.value != logging_command.get('action_name', ""):
+            self.logger.warn(f"Unknown action {logging_command.get('action_name')}")
             return
         self.logger.debug(f"{logging_command=}")
         variable = logging_command.get('parameters', {}).get('variable')
