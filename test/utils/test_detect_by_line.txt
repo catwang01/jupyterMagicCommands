@@ -8,14 +8,14 @@
 hello
 .
 
-[name2]  Unrelated leading characters disable the detection
+[name2]  Leading whitespaces (except \n) are ignored
 .
 { 
-    "line": " ##jmc[action.setvariable variable=test2]hello",
+    "line": "  \r\t##jmc[action.setvariable variable=test2]hello",
     "variable": "test2"
 }
 .
-None
+hello
 .
 
 [name3]  Unrelated leading characters disable the detection
@@ -56,4 +56,14 @@ hello world what's your name
 }
 .
 None
+.
+
+[name8]  The trailing \r is removed
+.
+{ 
+    "line": "##jmc[action.setvariable variable=test2]hello world what's your name\r\n",
+    "variable": "test2"
+}
+.
+hello world what's your name
 .
