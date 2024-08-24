@@ -17,9 +17,9 @@ class ActionDetector:
     def detect_action_by_line(self, line: str) -> None:
         i = line.find('\n') 
         if i != -1:
-            self.logger.error("Multiple lines detected, only the first line will be used. If you want to detect action in multiple lines, use detect_action_by_chunk instead")
+            self.logger.warn("Multiple lines detected, only the first line will be used. If you want to detect action in multiple lines, use detect_action_by_chunk instead")
             line = line[:i]
-        template = r"^##jmc\[action.setvariable variable=(?P<variable>.*?)\](?P<value>.*)(\r)?$"
+        template = r"^##jmc\[action.setvariable variable=(?P<variable>.*?)\](?P<value>.*)$"
         self.logger.debug("Detecting action from line")
         self.logger.debug(f"{line=}")
         ret = re.search(template, line)
@@ -28,6 +28,7 @@ class ActionDetector:
             return
         variable = ret.group("variable")
         value = ret.group("value")
+        value = value.rstrip('\r')
         self.logger.info(f"Setting variable {variable} to {value}")
         self.shell.user_ns[variable] = value
 
