@@ -1,5 +1,4 @@
 from IPython.display import IFrame
-import argparse
 from html import escape
 from IPython.core.magic_arguments import argument, magic_arguments, parse_argstring
 
@@ -24,15 +23,15 @@ class JMCIFrame(IFrame):
 
 
 @magic_arguments()
-@argument("-w", "--width", type=int, default=500, help="Width of the iframe")
-@argument("-h", "--height", type=int, default=300, help="Height of the iframe")
+@argument("-w", "--width", type=str, default="100%", help="Width of the iframe")
+@argument("-h", "--height", type=str, default="200px", help="Height of the iframe")
 def html(line: str, cell: str):
     """
     The extension is introduced to replace the built-in html magic.
 
-    The problem of the built-in html magic is that there is no isolation for the html rendered by the magic and the notebook page.
+    The problem of the built-in html magic is that there is no isolation for the html rendered by the magic and the dom of the notebook page.
 
-    The html magic in this extension renders the html in an iframe, which is isolated from the notebook page.
+    The html magic in this extension renders the html in an iframe, which is isolated from the dom of the notebook page.
     """
     args = parse_argstring(html, line)
     return JMCIFrame(escape(cell), width=args.width, height=args.height)
