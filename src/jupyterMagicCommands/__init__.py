@@ -12,6 +12,7 @@ if IS_IN_JUPYTER:
     from .extensions import drawio_ext
     from .extensions import _script_ext
     from .extensions import html_ext
+    from .extensions import js_ext
     from .version import version
 
     def load_ipython_extension(ipython):
@@ -25,6 +26,7 @@ if IS_IN_JUPYTER:
             cs_ext,
             ai_ext,
             drawio_ext,
-            html_ext
+            html_ext,
+            js_ext
         ]:
             module.load_ipython_extension(ipython)
