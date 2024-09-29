@@ -85,7 +85,7 @@ class DotnetCli(IDotnetCli):
 
     def run(self, cwd: Optional[str] = None) -> None:
         # always verbose for `dotnet run`, because it will print the output of the program
-        executeCmd("dotnet run", cwd=cwd or self.cwd, verbose=True, backend="popen")
+        executeCmd("dotnet run --configuration Release --no-restore", cwd=cwd or self.cwd, verbose=True, backend="popen")
 
     def new(self, projectType: str, projectName: str, cwd: Optional[str] = None) -> None:
         executeCmd(
