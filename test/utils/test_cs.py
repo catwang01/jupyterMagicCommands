@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from tempfile import mkdtemp
 from typing import List, Tuple
@@ -23,7 +24,7 @@ def emptyCacheInfo():
 
 @pytest.fixture
 def dotnetCli():
-    dotnetCli = DotnetCli()
+    dotnetCli = DotnetCli("/home/catwang/dotnet/dotnet")
     from unittest.mock import MagicMock
 
     dotnetCli.addPackage = MagicMock()
@@ -86,7 +87,7 @@ def generateTestDataForMultiple():
                     ),
                 },
             ),
-        ]
+        ],
     ]
 
 
@@ -167,12 +168,16 @@ def test_1(
     assert (Path(targetDirectory) / "Program.cs").exists()
     assert (Path(targetDirectory) / "Program.cs").read_text() == cell
     assert (Path(cacheRoot) / "__empty__").exists()
+    assert (Path(cacheRoot) / "__empty__" / "project").exists()
+    assert (Path(cacheRoot) / "__empty__" / "cache.json").exists()
+    assert (
+        Path(cacheRoot) / "__empty__" / "cache.json"
+    ).read_text() == '{"hitCount": 1, "packages": {}}'
     assert cacheManager.cacheInfo == expected
 
+
 @pytest.mark.parametrize("data", generateTestDataForMultiple())
-def test_multiple(
-    dotnetCli, tmp_path, data: List[Tuple[List[PackageInfo], CacheInfo]]
-):
+def test_multiple(dotnetCli, tmp_path, data: List[Tuple[List[PackageInfo], CacheInfo]]):
     cell = 'Console.WriteLine("hello");'
     cacheRoot = Path(tmp_path)
     if not cacheRoot.exists():
@@ -195,6 +200,7 @@ def test_multiple(
         assert (Path(cacheRoot) / "__empty__").exists()
         assert cacheManager.cacheInfo == expected
 
+
 def test_cacheManager_load_save(emptyCacheInfo, dotnetCli, tmp_path):
     cacheRoot = Path(tmp_path)
     if not cacheRoot.exists():
@@ -205,4 +211,51 @@ def test_cacheManager_load_save(emptyCacheInfo, dotnetCli, tmp_path):
     cacheManager.saveCache()
     cache_file_path = cacheRoot / "cache.json"
     assert cache_file_path.exists()
-    assert cache_file_path.read_text() == '{"__empty__": {"hitCount": 0, "packages": {}}}'
+    assert (
+        cache_file_path.read_text() == '{"__empty__": {"hitCount": 0, "packages": {}}}'
+    )
+
+
+def test_rebuild_cache_info(tmp_path, dotnetCli):
+    cacheRoot = Path(tmp_path)
+    if not cacheRoot.exists():
+        cacheRoot.mkdir(parents=True)
+
+    cacheManager = CSCodeProjectCacheManager(dotnetCli, cacheRoot)
+    cacheManager.saveCache()
+    cache_file_path = cacheRoot / "cache.json"
+    assert cache_file_path.exists()
+    assert json.loads(cache_file_path.read_text()) == {
+        "__empty__": {"hitCount": 0, "packages": {}}
+    }
+
+    # add a package to the cache
+    cacheManager.tryToLoadFromCache(
+        "test", [processPackageInfo("Newtonsoft.Json@12.0.3")]
+    )
+    cacheManager.addToCache("test", [processPackageInfo("Newtonsoft.Json@12.0.3")])
+    cacheManager.saveCache()
+    assert cacheManager.cacheInfo == {
+        "__empty__": CacheInfoItem(hitCount=1, packages={}),
+        "294314ba6e464fec7c368a55fe4a92f1": CacheInfoItem(
+            hitCount=0,
+            packages={
+                "Newtonsoft.Json": {"name": "Newtonsoft.Json", "version": "12.0.3"}
+            },
+        ),
+    }
+
+    cache_file_path.unlink()
+    assert not cache_file_path.exists()
+    cacheManager.rebuildCacheInfo()
+    cacheManager.saveCache()
+    assert cache_file_path.exists()
+    assert cacheManager.cacheInfo == {
+        "__empty__": CacheInfoItem(hitCount=1, packages={}),
+        "294314ba6e464fec7c368a55fe4a92f1": CacheInfoItem(
+            hitCount=0,
+            packages={
+                "Newtonsoft.Json": {"name": "Newtonsoft.Json", "version": "12.0.3"}
+            },
+        ),
+    }

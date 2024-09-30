@@ -21,12 +21,15 @@ class PackageInfo(TypedDict):
     name: Required[str]
     version: NotRequired[str]
 
+
 @dataclass
 class CacheInfoItem:
     hitCount: int
     packages: Dict[str, PackageInfo]
 
+
 CacheInfo = Dict[str, CacheInfoItem]
+
 
 class CacheStatus(Enum):
     MISS = 0  # Not used at this time
@@ -39,7 +42,9 @@ class IDotnetCli:
     def addPackage(self, package: PackageInfo, cwd: Optional[str] = None) -> None:
         pass
 
-    def new(self, projectType: str, projectName: str, cwd: Optional[str] = None) -> None:
+    def new(
+        self, projectType: str, projectName: str, cwd: Optional[str] = None
+    ) -> None:
         pass
 
     def run(self, cwd: Optional[str] = None) -> None:
@@ -56,7 +61,20 @@ class IDotnetCli:
 
 class DotnetCli(IDotnetCli):
 
-    def __init__(self, cwd: str = ".", verbose: bool=False, logger: Logger=NULL_LOGGER) -> None:
+    def __init__(
+        self,
+        executable_path: Optional[str] = None,
+        cwd: str = ".",
+        verbose: bool = False,
+        logger: Logger = NULL_LOGGER,
+    ) -> None:
+        self.executable_path = executable_path
+        if self.executable_path is None:
+            self.executable_path = shutil.which("dotnet")
+            if self.executable_path is None:
+                raise FileNotFoundError(
+                    "dotnet executable is not provided and not detected"
+                )
         self._cwd = cwd
         self.logger = logger
         self.verbose = verbose
@@ -72,24 +90,31 @@ class DotnetCli(IDotnetCli):
     def addPackage(self, package: PackageInfo, cwd: Optional[str] = None) -> None:
         if "version" in package:
             executeCmd(
-                f"dotnet add package {package['name']} --version {package['version']}",
+                f"{self.executable_path} add package {package['name']} --version {package['version']}",
                 cwd=cwd or self.cwd,
                 verbose=self.verbose,
             )
         else:
             executeCmd(
-                f"dotnet add package {package['name']}",
+                f"{self.executable_path} add package {package['name']}",
                 cwd=cwd or self.cwd,
                 verbose=self.verbose,
             )
 
     def run(self, cwd: Optional[str] = None) -> None:
         # always verbose for `dotnet run`, because it will print the output of the program
-        executeCmd("dotnet run --configuration Release --no-restore", cwd=cwd or self.cwd, verbose=True, backend="popen")
-
-    def new(self, projectType: str, projectName: str, cwd: Optional[str] = None) -> None:
         executeCmd(
-            f"dotnet new {projectType} -o {projectName}",
+            f"{self.executable_path} run --configuration Release --no-restore",
+            cwd=cwd or self.cwd,
+            verbose=True,
+            backend="popen",
+        )
+
+    def new(
+        self, projectType: str, projectName: str, cwd: Optional[str] = None
+    ) -> None:
+        executeCmd(
+            f"{self.executable_path} new {projectType} -o {projectName}",
             cwd=cwd or self.cwd,
             verbose=self.verbose,
         )
@@ -103,28 +128,51 @@ class CSCodeProjectCacheManager:
     dotnetCli: IDotnetCli
     cacheInfo: CacheInfo
     EMPTY_CACHE_KEY = "__empty__"
+    PROJECT_NAME = "project"
+    CACHE_INFO_FILE_NAME = "cache.json"
 
-    def __init__(self, dotnetCli: IDotnetCli, cacheRoot: Optional[Path] = None, logger: Logger = NULL_LOGGER) -> None:
+    def __init__(
+        self,
+        dotnetCli: IDotnetCli,
+        cacheRoot: Optional[Path] = None,
+        logger: Logger = NULL_LOGGER,
+    ) -> None:
         self.dotnetCli = dotnetCli
         self.logger = logger
         self.cacheRoot = cacheRoot or Path("/tmp/jmc/cs")
         if not self.cacheRoot.exists():
             self.cacheRoot.mkdir(parents=True)
-        self.cacheInfoFile = self.cacheRoot / "cache.json"
+        self.cacheInfoFile = self.cacheRoot / self.CACHE_INFO_FILE_NAME
 
         if self.cacheInfoFile.exists():
             try:
-                self.cacheInfo = json.loads(self.cacheInfoFile.read_text(), cls=self.EnhancedJSONDecoder)
+                self.cacheInfo = json.loads(
+                    self.cacheInfoFile.read_text(), cls=self.EnhancedJSONDecoder
+                )
             except Exception as e:
-                raise Exception(f"Failed to load cache info") from e
+                logger.error(
+                    "Failed to load cache info from %s, try to rebuild cacheInfo",
+                    self.cacheInfoFile,
+                )
+                self.rebuildCacheInfo()
         else:
             self.cacheInfo = {}
             cache_path = self.cacheRoot / self.EMPTY_CACHE_KEY
             if not cache_path.exists():
+                cache_path.mkdir()
                 self.dotnetCli.new(
-                    "console", projectName=self.EMPTY_CACHE_KEY, cwd=str(self.cacheRoot)
+                    "console", projectName=self.PROJECT_NAME, cwd=str(cache_path)
                 )
             self._addCacheItem(self.EMPTY_CACHE_KEY, [])
+
+    def rebuildCacheInfo(self):
+        for fileOrDir in self.cacheRoot.iterdir():
+            if fileOrDir.is_dir():
+                info_path = fileOrDir / self.CACHE_INFO_FILE_NAME
+                if info_path.exists():
+                    self.cacheInfo[fileOrDir.name] = json.loads(
+                        info_path.read_text(), cls=self.EnhancedJSONDecoder
+                    )
 
     def tryToLoadFromCache(
         self, directory: str, packages
@@ -137,7 +185,7 @@ class CSCodeProjectCacheManager:
             shortestMissingPackages = packages
             hittedCacheDir = self.EMPTY_CACHE_KEY
             for cacheDir, cacheInfoItem in self.cacheInfo.items():
-                hittedPackages, missingPackageInfo = self.getHittedPackages(
+                hittedPackages, missingPackageInfo = self._getHittedPackages(
                     cacheInfoItem.packages, packages
                 )
                 if shortestMissingPackages is None or len(missingPackageInfo) < len(
@@ -146,29 +194,52 @@ class CSCodeProjectCacheManager:
                     shortestMissingPackages = missingPackageInfo
                     hittedCacheDir = cacheDir
             self._copyFromCache(hittedCacheDir, directory)
-            cacheStatus = CacheStatus.PARTIAL_HIT if len(shortestMissingPackages) > 0 \
-                                                  else CacheStatus.FULL_HIT
+            cacheStatus = (
+                CacheStatus.PARTIAL_HIT
+                if len(shortestMissingPackages) > 0
+                else CacheStatus.FULL_HIT
+            )
             return cacheStatus, shortestMissingPackages
 
-    def _addToCache(self, directory: str, packages: List[PackageInfo]) -> None:
+    def addToCache(self, directory: str, packages: List[PackageInfo]) -> None:
         cacheKey = md5(json.dumps(packages).encode()).hexdigest()
-        shutil.copytree(directory, self.cacheRoot / cacheKey, dirs_exist_ok=True)
+        shutil.copytree(
+            directory, self.cacheRoot / cacheKey / self.PROJECT_NAME, dirs_exist_ok=True
+        )
         self._addCacheItem(cacheKey, packages)
 
     def _copyFromCache(self, cacheKey: str, directory: str) -> None:
         shutil.copytree(
-            self.cacheRoot / cacheKey, directory, dirs_exist_ok=True
+            self.cacheRoot / cacheKey / self.PROJECT_NAME, directory, dirs_exist_ok=True
         )
-        self.cacheInfo[cacheKey].hitCount += 1
+        self._incrementHitCount(cacheKey)
         self.logger.debug("hit cache to %s", cacheKey)
 
-    def _addCacheItem(self, cacheKey: str, packages: List[PackageInfo]) -> None:
-        self.cacheInfo[cacheKey] = CacheInfoItem(
-            hitCount=0,
-            packages={package["name"]: package for package in packages}
-        )
+    def _incrementHitCount(self, cacheKey: str) -> None:
+        cacheInfo = self.cacheInfo[cacheKey]
+        cacheInfo.hitCount += 1
+        try:
+            (self.cacheRoot / cacheKey / self.CACHE_INFO_FILE_NAME).write_text(
+                json.dumps(cacheInfo, cls=self.EnhancedJSONEncoder)
+            )
+        except Exception as e:
+            cacheInfo.hitCount -= 1
+            raise e
 
-    def getHittedPackages(
+    def _addCacheItem(self, cacheKey: str, packages: List[PackageInfo]) -> None:
+        cacheInfo = CacheInfoItem(
+            hitCount=0, packages={package["name"]: package for package in packages}
+        )
+        self.cacheInfo[cacheKey] = cacheInfo
+        try:
+            (self.cacheRoot / cacheKey / self.CACHE_INFO_FILE_NAME).write_text(
+                json.dumps(cacheInfo, cls=self.EnhancedJSONEncoder)
+            )
+        except Exception as e:
+            self.cacheInfo.pop(cacheKey)
+            raise e
+
+    def _getHittedPackages(
         self, packageInfosA: Dict[str, PackageInfo], packages: List[PackageInfo]
     ) -> Tuple[List[PackageInfo], List[PackageInfo]]:
         hittedPackages: List[PackageInfo] = []
@@ -193,7 +264,7 @@ class CSCodeProjectCacheManager:
             if dataclasses.is_dataclass(o):
                 return dataclasses.asdict(o)
             return super().default(o)
-    
+
     class EnhancedJSONDecoder(json.JSONDecoder):
 
         def __init__(self, *args, **kwargs):
@@ -210,6 +281,7 @@ class CSCodeProjectCacheManager:
         with self.cacheInfoFile.open("w") as f:
             json.dump(self.cacheInfo, f, cls=self.EnhancedJSONEncoder)
 
+
 class CSCodeRunnerOptions(TypedDict):
     cache: bool
     packages: List[PackageInfo]
@@ -220,6 +292,7 @@ DEFAULT_CS_CODE_RUNNER_OPTIONS: CSCodeRunnerOptions = {
     "packages": [],
 }
 
+
 class CSCodeRunner:
 
     dotnetCli: IDotnetCli
@@ -228,18 +301,18 @@ class CSCodeRunner:
         self,
         cacheManager: CSCodeProjectCacheManager,
         dotnetCli: IDotnetCli,
-        options: CSCodeRunnerOptions=DEFAULT_CS_CODE_RUNNER_OPTIONS,
+        options: CSCodeRunnerOptions = DEFAULT_CS_CODE_RUNNER_OPTIONS,
         logger: Logger = NULL_LOGGER,
     ):
         self.options = options
         self.cacheManager = cacheManager
         self.dotnetCli = dotnetCli
         self.logger = logger
-    
+
     @property
     def cache(self) -> bool:
         return self.options.get("cache", True)
-    
+
     @property
     def packages(self) -> List[PackageInfo]:
         return self.options.get("packages", [])
@@ -255,7 +328,7 @@ class CSCodeRunner:
         for package in missingPackages:
             self.dotnetCli.addPackage(package)
         if self.cache and cacheStatus != CacheStatus.FULL_HIT:
-            self.cacheManager._addToCache(directory, self.packages)
+            self.cacheManager.addToCache(directory, self.packages)
 
     def runCsharp(self, cell, directory: Optional[str] = None) -> None:
         # since C#9, there is no need to have a Main
@@ -268,11 +341,11 @@ class CSCodeRunner:
         else:
             targetDirectory = Path(directory)
         self.dotnetCli.cwd = str(targetDirectory)
-        self.logger.debug('Generating project in %s', targetDirectory)
+        self.logger.debug("Generating project in %s", targetDirectory)
         self.generateProject(str(targetDirectory))
         tmpFile = targetDirectory / "Program.cs"
         tmpFile.write_text(code)
-        self.logger.debug('Running code in %s', targetDirectory)
+        self.logger.debug("Running code in %s", targetDirectory)
         self.dotnetCli.run()
 
 
