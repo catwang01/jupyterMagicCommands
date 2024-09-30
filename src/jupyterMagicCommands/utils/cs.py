@@ -37,6 +37,10 @@ class CacheStatus(Enum):
     FULL_HIT = 2
 
 
+class DotnetCliRunOptions(TypedDict):
+    configuration: NotRequired[str]
+
+
 class IDotnetCli:
 
     def addPackage(self, package: PackageInfo, cwd: Optional[str] = None) -> None:
@@ -47,11 +51,13 @@ class IDotnetCli:
     ) -> None:
         pass
 
-    def run(self, cwd: Optional[str] = None) -> None:
+    def run(
+        self, cwd: Optional[str] = None, options: Optional[DotnetCliRunOptions] = None
+    ) -> None:
         pass
 
     @property
-    def cwd(self) -> str:
+    def cwd(self) -> str: # type: ignore
         pass
 
     @cwd.setter
@@ -101,10 +107,19 @@ class DotnetCli(IDotnetCli):
                 verbose=self.verbose,
             )
 
-    def run(self, cwd: Optional[str] = None) -> None:
+    def run(
+        self, cwd: Optional[str] = None, options: Optional[DotnetCliRunOptions] = None
+    ) -> None:
         # always verbose for `dotnet run`, because it will print the output of the program
+        dotnetRunOptions: DotnetCliRunOptions = options or {}
+        cmd = f"{self.executable_path} run"
+        configuration = dotnetRunOptions.get("configuration", "Release")
+        cmd += f" --configuration {configuration}"
+        cmd += " --no-restore"
+        self.logger.debug("Running command: %s", cmd)
+
         executeCmd(
-            f"{self.executable_path} run --configuration Release --no-restore",
+            cmd,
             cwd=cwd or self.cwd,
             verbose=True,
             backend="popen",
@@ -262,7 +277,7 @@ class CSCodeProjectCacheManager:
     class EnhancedJSONEncoder(json.JSONEncoder):
         def default(self, o):
             if dataclasses.is_dataclass(o):
-                return dataclasses.asdict(o)
+                return dataclasses.asdict(o) # type: ignore
             return super().default(o)
 
     class EnhancedJSONDecoder(json.JSONDecoder):
@@ -330,7 +345,12 @@ class CSCodeRunner:
         if self.cache and cacheStatus != CacheStatus.FULL_HIT:
             self.cacheManager.addToCache(directory, self.packages)
 
-    def runCsharp(self, cell, directory: Optional[str] = None) -> None:
+    def runCsharp(
+        self,
+        cell,
+        directory: Optional[str] = None,
+        runOptions: Optional[DotnetCliRunOptions] = None,
+    ) -> None:
         # since C#9, there is no need to have a Main
         # code = completeCode(cell, args)
         code = cell
@@ -346,7 +366,7 @@ class CSCodeRunner:
         tmpFile = targetDirectory / "Program.cs"
         tmpFile.write_text(code)
         self.logger.debug("Running code in %s", targetDirectory)
-        self.dotnetCli.run()
+        self.dotnetCli.run(options=runOptions)
 
 
 def processPackageInfo(s: str) -> PackageInfo:

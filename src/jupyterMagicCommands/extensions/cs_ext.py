@@ -1,12 +1,16 @@
 import argparse
 import logging
 import sys
-from typing import List, Set, TypedDict
+from typing import Set
 
-from jupyterMagicCommands.utils.cs import (CSCodeProjectCacheManager,
-                                           CSCodeRunner, CSCodeRunnerOptions,
-                                           DotnetCli, PackageInfo,
-                                           processPackageInfo)
+from jupyterMagicCommands.utils.cs import (
+    CSCodeProjectCacheManager,
+    CSCodeRunner,
+    CSCodeRunnerOptions,
+    DotnetCli,
+    DotnetCliRunOptions,
+    processPackageInfo,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -25,12 +29,14 @@ dotnetCli = DotnetCli(logger=logger)
 cacheManager = CSCodeProjectCacheManager(dotnetCli, logger=logger)
 runner = CSCodeRunner(cacheManager, dotnetCli, logger=logger)
 
+
 def transformLogLevel(s):
     level = {"INFO": logging.INFO, "DEBUG": logging.DEBUG}.get(s.upper())
     if level is None:
         print(f"Unsupported level: {s}")
         sys.exit(1)
     return level
+
 
 def cs(line, cell):
     parser = argparse.ArgumentParser()
@@ -51,6 +57,12 @@ def cs(line, cell):
         help="Whether disable caching for creating packages",
     )
     parser.add_argument("--verbose", action="store_true", default=False)
+    parser.add_argument(
+        "--configuration",
+        type=str,
+        default="Release",
+        help="Configuration for dotnet run",
+    )
     if line.strip() != "":
         args = parser.parse_args(line.strip(" ").split(" "))
     else:
@@ -68,11 +80,13 @@ def cs(line, cell):
     logger.debug("args: %s", args)
 
     dotnetCli.verbose = args.verbose
-    runnerOptions: CSCodeRunnerOptions = vars(args)
+    runnerOptions: CSCodeRunnerOptions = vars(args)  # type: ignore
     runner.options = runnerOptions
     logger.debug("runnerOptions: %s", runnerOptions)
-    runner.runCsharp(cell)
+    runOptions: DotnetCliRunOptions = {"configuration": args.configuration}
+    runner.runCsharp(cell, runOptions=runOptions)
     cacheManager.saveCache()
+
 
 def load_ipython_extension(ipython):
     ipython.register_magic_function(cs, "cell")
