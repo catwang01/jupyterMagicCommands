@@ -8,7 +8,8 @@ from tempfile import TemporaryDirectory
 from IPython.core.magic import Magics, cell_magic, magics_class
 from IPython.core.magic_arguments import (argument, magic_arguments,
                                           parse_argstring)
-from pexpect import which
+# from pexpect import which
+from shutil import which
 
 from jupyterMagicCommands.outputters import BasicFileSystemOutputterFactory
 from jupyterMagicCommands.outputters.abstract_outputter import \
@@ -24,11 +25,11 @@ class PwshArgs:
 manager = SessionManager()
 
 def pwsh(args: PwshArgs, manager: SessionManager, outputter: AbstractOutputter, cell: str):
-    pwshPath = which('powershell') or which('pwsh')
     encoding = 'utf8'
     with TemporaryDirectory() as tmpdirname:
         filePath = Path(os.path.join(tmpdirname, str(int(time.time())) + ".ps1"))
         filePath.write_text(cell, encoding=encoding)
+        pwshPath = which('powershell') or which('pwsh')
         if sys.platform == 'win32':
             retriever = lambda : Session(pwshPath, outputter=outputter)
             session = manager.getOrCreateSession(args.sessionId, retriever)

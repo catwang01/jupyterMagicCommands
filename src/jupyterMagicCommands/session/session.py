@@ -25,6 +25,8 @@ class Session:
         self.outputter.register_read_callback(self.process.send)
 
     def start_process(self, program: str):
+        if program is None:
+            raise ValueError("program parameter can't be None!")
         self.process = Spawn(program)
         time.sleep(2)
         init_banner = self.process.read_nonblocking(4096, 2)
