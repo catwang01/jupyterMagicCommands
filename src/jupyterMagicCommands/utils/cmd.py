@@ -20,7 +20,8 @@ def _run_command(cmd):
 
 def executeCmd(cmd, cwd='.', verbose=True, backend=None):
     currentDir = Path.cwd()
-    backend = backend.lower() or "jmc"
+    backend = backend or "jmc"
+    backend = backend.lower()
     os.chdir(cwd)
     ret = None
     try:
