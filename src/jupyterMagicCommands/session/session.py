@@ -10,6 +10,9 @@ if  sys.platform == "win32":
 else:
     Spawn = pexpect.spawn
 
+
+# This code works for powershell on Windows but does not work for pwsh on linux
+# See https://github.com/PowerShell/PowerShell/issues/14932 fore more details
 class Session:
 
     process: Spawn
