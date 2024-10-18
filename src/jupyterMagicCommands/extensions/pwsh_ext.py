@@ -49,6 +49,18 @@ class PowershellMagicCommand(Magics):
         default="-1",
         help=("Sessoin Id"),
     )
+    @argument(
+        "-d",
+        "--cwd",
+        type=str,
+        default=".",
+        help=("The current working directory"),
+    )
+    @argument(
+        "--create",
+        action="store_true",
+        help=("Create the current working directory if it doesn't exist")
+    )
     @cell_magic
     def pwsh(self, line, cell):
         args = parse_argstring(self.pwsh, line)
@@ -56,7 +68,19 @@ class PowershellMagicCommand(Magics):
             raise Exception("Session Id is only supported on non-Windows platforms")
         outputterFactory = BasicFileSystemOutputterFactory(self.shell)
         outputter = outputterFactory.create_outputter(False)
-        pwsh(args, manager, outputter, cell)
+
+        if not os.path.exists(args.cwd):
+            if args.create:
+                os.makedirs(args.cwd)
+            else:
+                print(f"Directory '{args.cwd}' does not exist, please specify --create option to create it")
+            return
+        origin = os.getcwd()
+        os.chdir(args.cwd)
+        try:
+            pwsh(args, manager, outputter, cell)
+        finally:
+            os.chdir(origin)
 
 def load_ipython_extension(ipython):
     ipython.register_magics(PowershellMagicCommand)
