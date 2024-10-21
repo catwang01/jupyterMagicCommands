@@ -21,6 +21,8 @@ from jupyterMagicCommands.utils.cmd import executeCmd
 @dataclass
 class PwshArgs:
     sessionId: str
+    cwd: str
+    create: bool
 
 manager = SessionManager()
 
@@ -35,9 +37,14 @@ def pwsh(args: PwshArgs, manager: SessionManager, outputter: AbstractOutputter, 
             session = manager.getOrCreateSession(args.sessionId, retriever)
             if session is None:
                 raise Exception(f"Can't initialize session with id '{args.sessionId}'")
-            session.invoke_command('. '  + str(filePath))
+            session.invoke_command('. '  + str(filePath), args.cwd)
         else:
-            executeCmd(pwshPath + ' ' + str(filePath))
+            origin = os.getcwd()
+            os.chdir(args.cwd)
+            try:
+                executeCmd(pwshPath + ' ' + str(filePath))
+            finally:
+                os.chdir(origin)
 
 
 @magics_class
@@ -76,12 +83,8 @@ class PowershellMagicCommand(Magics):
             else:
                 print(f"Directory '{args.cwd}' does not exist, please specify --create option to create it")
             return
-        origin = os.getcwd()
-        os.chdir(args.cwd)
-        try:
-            pwsh(args, manager, outputter, cell)
-        finally:
-            os.chdir(origin)
+
+        pwsh(args, manager, outputter, cell)
 
 def load_ipython_extension(ipython):
     ipython.register_magics(PowershellMagicCommand)
