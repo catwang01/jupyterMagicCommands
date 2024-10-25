@@ -1,4 +1,5 @@
 import os
+import signal
 import re
 import time
 from typing import Optional
@@ -73,7 +74,7 @@ class Session:
                 if i != 0:
                     break
             except KeyboardInterrupt:
-                self.kill(9)
+                self.kill(signal.CTRL_BREAK_EVENT)
             except Exception:
                 break
         if cwd is not None:
