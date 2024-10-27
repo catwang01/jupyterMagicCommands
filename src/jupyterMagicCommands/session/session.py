@@ -2,6 +2,7 @@ import re
 import time
 import pexpect
 from jupyterMagicCommands.outputters import AbstractOutputter
+from jupyterMagicCommands.utils.log import NULL_LOGGER
 import sys
 
 if  sys.platform == "win32":
@@ -15,9 +16,10 @@ class Session:
     process: Spawn
     outputter: AbstractOutputter
 
-    def __init__(self, program: str, *args, outputter: AbstractOutputter):
+    def __init__(self, program: str, *args, outputter: AbstractOutputter, logger=NULL_LOGGER):
         self.outputter = outputter
         self.unique_prompt = "XYZPYEXPECTZYX"
+        self.logger = logger
         self.start_process(program)
         self.outputter.register_read_callback(self.process.send)
 
@@ -48,6 +50,7 @@ class Session:
                     timeout=0.02,
                 )  # fresh terminal per 0.2s
                 message = self.process.before.decode()
+                self.logger.debug('timeout with message: %s', message)
                 previousLen = len(prevMessage)
                 if not echoedCommandIsRemoved:
                     echoedCommandIsRemoved = True
