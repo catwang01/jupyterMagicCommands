@@ -84,4 +84,14 @@ class Session:
             
 
     def kill(self, signal: int):
-        self.process.kill(signal)
+        # self.process.kill(signal)
+
+        import ctypes
+        import sys
+
+        kernel = ctypes.windll.kernel32
+
+        kernel.FreeConsole()
+        kernel.AttachConsole(self.process.pid)
+        kernel.SetConsoleCtrlHandler(None, 1)
+        kernel.GenerateConsoleCtrlEvent(signal, 0)
