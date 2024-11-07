@@ -1,5 +1,6 @@
 import re
 import time
+import psutil
 import pexpect
 from jupyterMagicCommands.outputters import AbstractOutputter
 from jupyterMagicCommands.utils.log import NULL_LOGGER
@@ -16,10 +17,13 @@ class Session:
     process: Spawn
     outputter: AbstractOutputter
 
-    def __init__(self, program: str, *args, outputter: AbstractOutputter, logger=NULL_LOGGER):
+    def __init__(self, program: str, outputter: AbstractOutputter, *args,  logger=NULL_LOGGER, **kwargs):
         self.outputter = outputter
         self.unique_prompt = "XYZPYEXPECTZYX"
         self.logger = logger
+        self.program = program
+        self.auto_reconnect = kwargs.get('auto_reconnect', True)
+        self.auto_reconnect_times = kwargs.get('auto_reconnect_times', 3)
         self.start_process(program)
         self.outputter.register_read_callback(self.process.send)
 
@@ -40,6 +44,20 @@ class Session:
         self.process.expect(self.unique_prompt)
 
     def invoke_command(self, command: str):
+        if not self.isalive:
+            self.logger.error("The underlying process %s is dead", self.pid)
+            if not self.auto_reconnect:
+                return
+            else:
+                reconnect_times = self.auto_reconnect_times
+                while not self.isalive and reconnect_times > 0:
+                    reconnect_times -= 1
+                    self.logger.debug("Reconnecting ... %s times reconnect left", reconnect_times)
+                    self.start_process(self.program)
+                if not self.isalive:
+                    self.logger.error("Reconnecting %s times but still can't create the process", reconnect_times)
+                    return
+
         self.process.sendline(command)
         prevMessage = ""
         echoedCommandIsRemoved = False
@@ -64,6 +82,14 @@ class Session:
                 self.close()
             except Exception:
                 break
+    
+    @property
+    def pid(self) -> int:
+        return self.process.pid
+
+    @property
+    def isalive(self) -> bool:
+        return psutil.pid_exists(self.pid)
 
     def close(self):
         self.process.kill(9)
