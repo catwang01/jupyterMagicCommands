@@ -20,14 +20,17 @@ def _run_command(cmd):
 
 def executeCmd(cmd, cwd='.', verbose=True, backend=None):
     currentDir = Path.cwd()
+    backend = backend or "jmc"
+    backend = backend.lower()
     os.chdir(cwd)
     ret = None
     try:
+        # easy case, just use subprocess.run
         if not verbose: 
             ret = subprocess.run(cmd, shell=True, stdout=PIPE, stderr=PIPE)
-        elif backend is None or backend == "ipython":
+        elif backend == "ipython":
             get_ipython().system(cmd)
-        elif backend.lower() == "popen":
+        elif backend in { "popen", "jmc" }:
             _run_command(cmd)
         else:
             raise ValueError(f"Unsupported backend: {backend}")
