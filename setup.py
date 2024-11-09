@@ -25,7 +25,9 @@ setuptools.setup(
         "psutil",
         "retrying",
         "ipylab",
-        "ipykernel"
+        "ipykernel",
+        "pexpect",
+        "lark"
     ],
     extra_requires={
         'dev': [
