@@ -1,9 +1,11 @@
 import os
-from typing import List, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict, Protocol
 
 from IPython import get_ipython
 from IPython.core.magic_arguments import argument, magic_arguments, parse_argstring
 
+from jupyterMagicCommands.utils.jupyterNotebookRetriever import JupyterNotebookRetriever
+from jupyterMagicCommands.utils.jupyter_client import JupyterClient
 from jupyterMagicCommands.utils.log import getLogger
 from jupyterMagicCommands.utils.parser import parse_logLevel
 
@@ -16,18 +18,42 @@ class ConversationReturn(TypedDict):
 
 history: List[ConversationReturn] = []
 
+cachedBackend: Dict[str, 'Backend']  = {}
+
+
 @magic_arguments()
 @argument("--logLevel", type=parse_logLevel, default="ERROR")
+@argument("--type", type=str, default=None, choices=["note"], help="Specify type of the cell")
 def openai(line, cell):
+    ipython = get_ipython()
     args = parse_argstring(openai, line)
     global_logger.setLevel(args.logLevel)
     user_input = cell.strip()
     backend_name = os.getenv("AI_BACKEND", "AzureOpenAI")
-    backend: Backend = BackendFactory().get_backend(backend_name)
-    output = backend.conversation(user_input)
-    get_ipython().set_next_input(output)
+    if args.type not in cachedBackend:
+        backend: Backend = BackendFactory().get_backend(backend_name)
+        cachedBackend[args.type] = backend
+    replace = False
+    if args.type == "note":
+        jupyter_client = JupyterClient(
+            base_url=os.getenv("JMC_JUPYTER_BASE_URL"),
+            # base_url="http://catwang.top/jupyter",
+            password=os.getenv("JMC_JUPYTER_PASSWORD"),
+            logger=global_logger,
+        )
+        jupyterNotebookRetriever = JupyterNotebookRetriever(jupyter_client, ipython, global_logger)
+        cells = jupyterNotebookRetriever.get_current_notebook_json()
+        i = jupyterNotebookRetriever.get_current_cell_index()
+        cells_before_current_one = cells["cells"][:i]
+        user_input = "\n\n".join(["\n".join(cell["source"]) for cell in cells_before_current_one])
+        if cell:
+            user_input += "\n\n" + cell
+        replace = True
+    output = cachedBackend[args.type].conversation(user_input)
+    global_logger.debug(f"User input is {user_input}")
+    ipython.set_next_input(output, replace=replace)
 
-class Backend:
+class Backend(Protocol):
     def conversation(self, user_input: str) -> str: ...
 
 
@@ -125,4 +151,4 @@ class AzureOpenAIBackend(Backend):
         return output
 
 def load_ipython_extension(ipython):
-    ipython.register_magic_function(openai, "cell")
+    ipython.register_magic_function(openai, "line_cell")
