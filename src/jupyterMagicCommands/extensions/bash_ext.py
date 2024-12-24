@@ -1,5 +1,6 @@
 import argparse
 import os
+import shlex
 import tempfile
 import time
 from dataclasses import dataclass
@@ -241,9 +242,8 @@ def get_args(line: str) -> BashArgsNS:
         default=None,
         help="save output into a variable",
     )
-    line = line.strip("\n").strip(" ").lstrip("%%bash")
     if line:
-        args = parser.parse_args(line.split(" "), namespace=BashArgsNS())
+        args = parser.parse_args(shlex.split(line), namespace=BashArgsNS())
     else:
         args = parser.parse_args([], namespace=BashArgsNS())
     if args.container == EMPTY_CONTAINER_NAME:

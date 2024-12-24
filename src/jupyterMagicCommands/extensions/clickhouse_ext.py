@@ -1,4 +1,5 @@
 import argparse
+import shlex
 import requests
 import pandas as pd
 from io import StringIO
@@ -71,10 +72,7 @@ class PrettyCompactFormatHandler(VerticalFormatHandler):
 
 def ck(line, cell):
     parser = getParser()
-    inArgs = line.strip().split(' ')
-    if inArgs == ['']:
-        inArgs = []
-    args = parser.parse_args(inArgs)
+    args = parser.parse_args(shlex.split(line))
     url = args.url
 
     sio = StringIO(cell)

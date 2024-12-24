@@ -4,6 +4,7 @@ import argparse
 from argparse import Namespace
 from io import StringIO
 from logging import DEBUG, ERROR, INFO
+import shlex
 
 from jupyterMagicCommands.filesystem.filesystem_factory import \
     FileSystemFactory
@@ -37,7 +38,7 @@ def get_args(line: str):
     parser.add_argument('-f', '--force', action='store_true', default=False)
     parser.add_argument('-d', '--directory', default='.')
     parser.add_argument('-l', '--logLevel', choices=[DEBUG, INFO, ERROR], default=INFO)
-    args = parser.parse_args(line.strip(' ').split(' '))
+    args = parser.parse_args(shlex.split(line))
     logger.setLevel(args.logLevel)
     return args
 
