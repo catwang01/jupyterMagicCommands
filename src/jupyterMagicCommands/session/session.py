@@ -1,5 +1,8 @@
+import os
+import signal
 import re
 import time
+from typing import Optional
 import pexpect
 from jupyterMagicCommands.outputters import AbstractOutputter
 import sys
@@ -10,6 +13,9 @@ if  sys.platform == "win32":
 else:
     Spawn = pexpect.spawn
 
+
+# This code works for powershell on Windows but does not work for pwsh on linux
+# See https://github.com/PowerShell/PowerShell/issues/14932 fore more details
 class Session:
 
     process: Spawn
@@ -22,6 +28,8 @@ class Session:
         self.outputter.register_read_callback(self.process.send)
 
     def start_process(self, program: str):
+        if program is None:
+            raise ValueError("program parameter can't be None!")
         self.process = Spawn(program)
         time.sleep(2)
         init_banner = self.process.read_nonblocking(4096, 2)
@@ -37,7 +45,15 @@ class Session:
         self.process.expect(self.unique_prompt)
         self.process.expect(self.unique_prompt)
 
-    def invoke_command(self, command: str):
+    def invoke_command(self, command: str, cwd: Optional[str] = None):
+        if cwd is not None:
+            # enter current directory in powershell
+            self.process.sendline("echo $pwd")
+            self.process.expect(self.unique_prompt)
+            original_cwd = self.process.before.decode()
+            self.process.sendline(f'cd "{cwd}"')
+            self.process.expect(self.unique_prompt)
+
         self.process.sendline(command)
         prevMessage = ""
         echoedCommandIsRemoved = False
@@ -46,7 +62,7 @@ class Session:
                 i = self.process.expect(
                     [pexpect.TIMEOUT, self.unique_prompt],
                     timeout=0.02,
-                )  # fresh terminal per 0.2s
+                )  # fresh terminal per 0.02s
                 message = self.process.before.decode()
                 previousLen = len(prevMessage)
                 if not echoedCommandIsRemoved:
@@ -58,9 +74,24 @@ class Session:
                 if i != 0:
                     break
             except KeyboardInterrupt:
-                self.close()
+                self.kill(signal.CTRL_BREAK_EVENT)
             except Exception:
                 break
+        if cwd is not None:
+            # go to the original directory
+            self.process.sendline(f"cd {original_cwd}")
+            self.process.expect(self.unique_prompt)
+            
 
-    def close(self):
-        self.process.kill(9)
+    def kill(self, signal: int):
+        # self.process.kill(signal)
+
+        import ctypes
+        import sys
+
+        kernel = ctypes.windll.kernel32
+
+        kernel.FreeConsole()
+        kernel.AttachConsole(self.process.pid)
+        kernel.SetConsoleCtrlHandler(None, 1)
+        kernel.GenerateConsoleCtrlEvent(signal, 0)
