@@ -1,5 +1,6 @@
 import argparse
 import logging
+import shlex
 import sys
 from typing import Set
 
@@ -63,10 +64,7 @@ def cs(line, cell):
         default="Release",
         help="Configuration for dotnet run",
     )
-    if line.strip() != "":
-        args = parser.parse_args(line.strip(" ").split(" "))
-    else:
-        args = parser.parse_args([])
+    args = parser.parse_args(shlex.split(line))
 
     specifiedPackages: Set[str] = set()
     for package in args.packages:
