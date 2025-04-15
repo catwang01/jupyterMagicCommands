@@ -47,7 +47,10 @@ class JupyterNotebookRetriever(IJupyterNotebookRetriever):
     def get_current_cell_index(self):
         notebook_json = self.get_current_notebook_json()
         cell_id = self.ipython.get_parent()["metadata"]['cellId']
+        self.logger.debug(f"Cell id is {cell_id}")
+        self.logger.debug(f"{len(notebook_json['cells'])} cells in the notebook")
         for i, cell in enumerate(notebook_json["cells"]):
+            self.logger.debug(f"Cell {i} is {cell['id']}, target is {cell_id}")
             if cell["id"] == cell_id:
                 return  i
         return -1

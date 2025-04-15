@@ -16,7 +16,9 @@ class ConversationReturn(TypedDict):
     content: str
 
 
-history: List[ConversationReturn] = []
+history: List[ConversationReturn] = [
+    {"role": "system", "content": "You are a note taker. You will be given a piece of markdown note and you will need to continue to generate the note."}
+]
 
 cachedBackend: Dict[str, 'Backend']  = {}
 
@@ -24,7 +26,7 @@ cachedBackend: Dict[str, 'Backend']  = {}
 @magic_arguments()
 @argument("--logLevel", type=parse_logLevel, default="ERROR")
 @argument("--type", type=str, default=None, choices=["note"], help="Specify type of the cell")
-def openai(line, cell):
+def openai(line, cell=""):
     ipython = get_ipython()
     args = parse_argstring(openai, line)
     global_logger.setLevel(args.logLevel)
@@ -44,13 +46,14 @@ def openai(line, cell):
         jupyterNotebookRetriever = JupyterNotebookRetriever(jupyter_client, ipython, global_logger)
         cells = jupyterNotebookRetriever.get_current_notebook_json()
         i = jupyterNotebookRetriever.get_current_cell_index()
+        global_logger.debug(f"Current cell index is {i}")
         cells_before_current_one = cells["cells"][:i]
-        user_input = "\n\n".join(["\n".join(cell["source"]) for cell in cells_before_current_one])
+        user_input = "\n\n".join(cell["source"] for cell in cells_before_current_one)
         if cell:
             user_input += "\n\n" + cell
         replace = True
-    output = cachedBackend[args.type].conversation(user_input)
     global_logger.debug(f"User input is {user_input}")
+    output = cachedBackend[args.type].conversation(user_input)
     ipython.set_next_input(output, replace=replace)
 
 class Backend(Protocol):
@@ -97,7 +100,8 @@ class OpenAIBackend(Backend):
         self.client = OpenAI()
 
     def conversation(self, user_input: str) -> str:
-        history.append({"role": "system", "content": user_input})
+        history.append({"role": "user", "content": user_input})
+        history.append({"role": "user", "content": "Continue to generate the note"})
         response = self.client.chat.completions.create(
             model=self.model,
             messages=history,
@@ -107,7 +111,7 @@ class OpenAIBackend(Backend):
             temperature=0,
         )
         output = response.choices[0].message.content
-        history.append({"role": "bot", "content": output})
+        history.append({"role": "assistant", "content": output})
         return output
 
 
@@ -129,7 +133,8 @@ class AzureOpenAIBackend(Backend):
         )
 
     def conversation(self, user_input: str) -> str:
-        history.append({"role": "system", "content": user_input})
+        history.append({"role": "user", "content": user_input})
+        history.append({"role": "user", "content": "Continue to generate the note"})
         global_logger.info(f"Adding one user message to the history, the current history len is {len(history)}")
         try:
             response = self.client.chat.completions.create(
