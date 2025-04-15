@@ -7,7 +7,7 @@ import tempfile
 from typing import List, Optional
 import ipykernel
 import nbformat
-from IPython.display import Image, display
+from IPython.display import Image, display, SVG
 from lxml import etree
 
 from jupyterMagicCommands.utils.jupyter_client import JupyterClient
@@ -88,15 +88,16 @@ class DrawIO:
         target_diagram = self.get_target_diagram(xml, processed_target_name)
         xml_str = self.get_xmfile_to_show(xml, target_diagram)
         with tempfile.TemporaryDirectory() as tempdir:
-            xml_file_path = os.path.join(tempdir, 'test.xml')
-            png_file_path = os.path.join(tempdir, 'test.xml.png')
+            xml_file_path = os.path.join(tempdir, 'test.drawio')
+            png_file_path = os.path.join(tempdir, f'test-{target_name}.svg')
             if processed_target_name not in diagram_names:
                 print(f"Not a valid diagram '{processed_target_name}'. The valid diagram names are {', '.join(diagram_names)}")
                 return
             with open(xml_file_path, 'w') as f:
                 f.write(xml_str)
-            cmd = f"docker run --rm -v {tempdir}:/files b1f6c1c4/draw.io-export png; exit 0"
+            cmd = f"docker run --rm -v {tempdir}:/data rlespinasse/drawio-export -f svg -o /data/ /data/test.drawio; exit 0"
             ret = subprocess.check_output(["/bin/bash", "-c", cmd], stderr=subprocess.STDOUT)
-            display(Image(filename=png_file_path))
+            # display(Image(filename=png_file_path))
+            display(SVG(filename=png_file_path))
 
         # self.display_drawio(xml_str, metadata={MIMETYPE: display_options or {}})
