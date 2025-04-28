@@ -1,9 +1,11 @@
 import os
-from typing import List, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict, Protocol
 
 from IPython import get_ipython
 from IPython.core.magic_arguments import argument, magic_arguments, parse_argstring
 
+from jupyterMagicCommands.utils.jupyterNotebookRetriever import JupyterNotebookRetriever
+from jupyterMagicCommands.utils.jupyter_client import JupyterClient
 from jupyterMagicCommands.utils.log import getLogger
 from jupyterMagicCommands.utils.parser import parse_logLevel
 
@@ -14,20 +16,47 @@ class ConversationReturn(TypedDict):
     content: str
 
 
-history: List[ConversationReturn] = []
+history: List[ConversationReturn] = [
+    {"role": "system", "content": "You are a note taker. You will be given a piece of markdown note and you will need to continue to generate the note."}
+]
+
+cachedBackend: Dict[str, 'Backend']  = {}
+
 
 @magic_arguments()
 @argument("--logLevel", type=parse_logLevel, default="ERROR")
-def openai(line, cell):
+@argument("--type", type=str, default=None, choices=["note"], help="Specify type of the cell")
+def openai(line, cell=""):
+    ipython = get_ipython()
     args = parse_argstring(openai, line)
     global_logger.setLevel(args.logLevel)
     user_input = cell.strip()
     backend_name = os.getenv("AI_BACKEND", "AzureOpenAI")
-    backend: Backend = BackendFactory().get_backend(backend_name)
-    output = backend.conversation(user_input)
-    get_ipython().set_next_input(output)
+    if args.type not in cachedBackend:
+        backend: Backend = BackendFactory().get_backend(backend_name)
+        cachedBackend[args.type] = backend
+    replace = False
+    if args.type == "note":
+        jupyter_client = JupyterClient(
+            base_url=os.getenv("JMC_JUPYTER_BASE_URL"),
+            # base_url="http://catwang.top/jupyter",
+            password=os.getenv("JMC_JUPYTER_PASSWORD"),
+            logger=global_logger,
+        )
+        jupyterNotebookRetriever = JupyterNotebookRetriever(jupyter_client, ipython, global_logger)
+        cells = jupyterNotebookRetriever.get_current_notebook_json()
+        i = jupyterNotebookRetriever.get_current_cell_index()
+        global_logger.debug(f"Current cell index is {i}")
+        cells_before_current_one = cells["cells"][:i]
+        user_input = "\n\n".join(cell["source"] for cell in cells_before_current_one)
+        if cell:
+            user_input += "\n\n" + cell
+        replace = True
+    global_logger.debug(f"User input is {user_input}")
+    output = cachedBackend[args.type].conversation(user_input)
+    ipython.set_next_input(output, replace=replace)
 
-class Backend:
+class Backend(Protocol):
     def conversation(self, user_input: str) -> str: ...
 
 
@@ -71,7 +100,8 @@ class OpenAIBackend(Backend):
         self.client = OpenAI()
 
     def conversation(self, user_input: str) -> str:
-        history.append({"role": "system", "content": user_input})
+        history.append({"role": "user", "content": user_input})
+        history.append({"role": "user", "content": "Continue to generate the note"})
         response = self.client.chat.completions.create(
             model=self.model,
             messages=history,
@@ -81,7 +111,7 @@ class OpenAIBackend(Backend):
             temperature=0,
         )
         output = response.choices[0].message.content
-        history.append({"role": "bot", "content": output})
+        history.append({"role": "assistant", "content": output})
         return output
 
 
@@ -103,7 +133,8 @@ class AzureOpenAIBackend(Backend):
         )
 
     def conversation(self, user_input: str) -> str:
-        history.append({"role": "system", "content": user_input})
+        history.append({"role": "user", "content": user_input})
+        history.append({"role": "user", "content": "Continue to generate the note"})
         global_logger.info(f"Adding one user message to the history, the current history len is {len(history)}")
         try:
             response = self.client.chat.completions.create(
@@ -125,4 +156,4 @@ class AzureOpenAIBackend(Backend):
         return output
 
 def load_ipython_extension(ipython):
-    ipython.register_magic_function(openai, "cell")
+    ipython.register_magic_function(openai, "line_cell")
