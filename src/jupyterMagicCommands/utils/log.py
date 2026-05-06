@@ -6,6 +6,8 @@ NULL_LOGGER.addHandler(logging.NullHandler())  # read below for reason
 
 def getLogger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
+    if logger.handlers:
+        return logger
     logger.setLevel(DEBUG)
 
     streamhandler = logging.StreamHandler()

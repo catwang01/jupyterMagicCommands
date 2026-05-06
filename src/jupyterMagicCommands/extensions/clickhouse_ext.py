@@ -88,8 +88,8 @@ def queryClickHousePlayGround(query: str, url: str, args: argparse.Namespace):
         'password': '',
         'default_format': args.format
     }
-    try: 
-        r = requests.get(url, params=data)
+    try:
+        r = requests.get(url, params=data, timeout=30)
     except Exception as e:
         print(e)
     

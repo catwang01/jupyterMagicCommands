@@ -12,19 +12,10 @@ from jupyterMagicCommands.utils.cs import (
     DotnetCliRunOptions,
     processPackageInfo,
 )
+from jupyterMagicCommands.utils.log import getLogger
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-streamhandler = logging.StreamHandler()
-streamhandler.setLevel(logging.DEBUG)
-
-formatter = logging.Formatter(
-    "%(asctime)s - %(filename)s - %(name)s - %(levelname)s - %(message)s"
-)
-streamhandler.setFormatter(formatter)
-
-logger.addHandler(streamhandler)
 
 try:
     dotnetCli = DotnetCli(logger=logger)

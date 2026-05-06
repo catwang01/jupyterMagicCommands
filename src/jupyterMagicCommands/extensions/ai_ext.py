@@ -71,7 +71,7 @@ class OpenAIBackend(Backend):
         self.client = OpenAI()
 
     def conversation(self, user_input: str) -> str:
-        history.append({"role": "system", "content": user_input})
+        history.append({"role": "user", "content": user_input})
         response = self.client.chat.completions.create(
             model=self.model,
             messages=history,
@@ -81,7 +81,7 @@ class OpenAIBackend(Backend):
             temperature=0,
         )
         output = response.choices[0].message.content
-        history.append({"role": "bot", "content": output})
+        history.append({"role": "assistant", "content": output})
         return output
 
 
@@ -103,7 +103,7 @@ class AzureOpenAIBackend(Backend):
         )
 
     def conversation(self, user_input: str) -> str:
-        history.append({"role": "system", "content": user_input})
+        history.append({"role": "user", "content": user_input})
         global_logger.info(f"Adding one user message to the history, the current history len is {len(history)}")
         try:
             response = self.client.chat.completions.create(

@@ -382,7 +382,7 @@ class MyScriptMagics(Magics):
             if p.returncode is None:
                 try:
                     p.terminate()
-                except:
+                except (ProcessLookupError, OSError):
                     pass
         time.sleep(0.1)
         self._gc_bg_processes()
@@ -392,7 +392,7 @@ class MyScriptMagics(Magics):
             if p.returncode is None:
                 try:
                     p.kill()
-                except:
+                except (ProcessLookupError, OSError):
                     pass
         self._gc_bg_processes()
 

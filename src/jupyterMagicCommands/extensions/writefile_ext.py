@@ -12,16 +12,10 @@ from jupyterMagicCommands.filesystem.Ifilesystem import IFileSystem
 from jupyterMagicCommands.extensions.constants import \
         EMPTY_CONTAINER_NAME, \
         JUPYTER_MAGIC_COMMAND_BASH_CURRENT_CONTAINER
+from jupyterMagicCommands.utils.log import getLogger
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 logger.setLevel(ERROR)
-
-streamhandler = logging.StreamHandler()
-streamhandler.setLevel(DEBUG)
-
-formatter = logging.Formatter("%(asctime)s - %(filename)s - %(name)s - %(levelname)s - %(message)s")
-streamhandler.setFormatter(formatter)
-logger.addHandler(streamhandler)
 
 def get_args(line: str):
     parser = argparse.ArgumentParser()

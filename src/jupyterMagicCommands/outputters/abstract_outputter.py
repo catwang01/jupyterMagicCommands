@@ -15,3 +15,6 @@ class AbstractOutputter(metaclass=ABCMeta):
     @abstractmethod
     def register_read_callback(self, cb: AbstractOutputterReadCB) -> None:
         pass
+
+    def close(self) -> None:
+        pass

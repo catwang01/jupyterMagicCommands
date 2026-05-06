@@ -43,7 +43,7 @@ class PowershellMagicCommand(Magics):
     @argument(
         "--sessionId",
         default="1",
-        help=("Sessoin Id"),
+        help=("Session Id"),
     )
     @cell_magic
     def pwsh(self, line, cell):

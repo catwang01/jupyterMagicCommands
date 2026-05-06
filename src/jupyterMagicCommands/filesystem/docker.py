@@ -172,7 +172,7 @@ mkdir -p '{path}'
         output = result.output.decode()
         if result.exit_code != 0:
             raise Exception(output)
-        return result == "d"
+        return output.strip() == "d"
 
     def remove(self, path: str) -> None:
         template = f"""

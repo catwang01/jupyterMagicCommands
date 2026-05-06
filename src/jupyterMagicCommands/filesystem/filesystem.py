@@ -132,6 +132,7 @@ class FileSystem(IFileSystem):
 
         outputter.register_read_callback(child.send)
         self._run_command(child, outputter)
+        outputter.close()
 
     def _run_command(self, child, outputter: AbstractOutputter):
         prevMessage = ""
