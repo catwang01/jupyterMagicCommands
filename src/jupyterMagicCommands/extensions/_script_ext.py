@@ -265,6 +265,7 @@ class MyScriptMagics(Magics):
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     stdin=asyncio.subprocess.PIPE,
+                    start_new_session=True,
                 )
             )
         except OSError as e:
@@ -370,8 +371,8 @@ class MyScriptMagics(Magics):
         for p in self.bg_processes:
             if p.returncode is None:
                 try:
-                    p.send_signal(signal.SIGINT)
-                except:
+                    os.killpg(os.getpgid(p.pid), signal.SIGINT)
+                except (ProcessLookupError, OSError):
                     pass
         time.sleep(0.1)
         self._gc_bg_processes()
