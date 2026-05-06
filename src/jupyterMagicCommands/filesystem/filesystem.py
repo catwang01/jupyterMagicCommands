@@ -59,7 +59,10 @@ class FileSystem(IFileSystem):
         # we use the true pid
         processes = psutil.process_iter(attrs=["pid", "name", "cmdline"])
         for p in processes:
-            command = " ".join(p.cmdline())
+            try:
+                command = " ".join(p.cmdline())
+            except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied):
+                continue
             self.logger.debug(f'The process {p} has the command {command}')
             # the correctness is built on the assumption that the template file saving the cell content is only run by this class
             if command and cmd == command:
