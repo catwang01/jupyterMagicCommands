@@ -26,9 +26,14 @@ streamhandler.setFormatter(formatter)
 
 logger.addHandler(streamhandler)
 
-dotnetCli = DotnetCli(logger=logger)
-cacheManager = CSCodeProjectCacheManager(dotnetCli, logger=logger)
-runner = CSCodeRunner(cacheManager, dotnetCli, logger=logger)
+try:
+    dotnetCli = DotnetCli(logger=logger)
+    cacheManager = CSCodeProjectCacheManager(dotnetCli, logger=logger)
+    runner = CSCodeRunner(cacheManager, dotnetCli, logger=logger)
+except FileNotFoundError:
+    dotnetCli = None
+    cacheManager = None
+    runner = None
 
 
 def transformLogLevel(s):
