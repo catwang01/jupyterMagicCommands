@@ -30,7 +30,7 @@ def pwsh(args: PwshArgs, manager: SessionManager, outputter: AbstractOutputter, 
     if session is None:
         raise Exception(f"Can't initialize session with id '{args.sessionId}'")
 
-    encoding = 'utf8'
+    encoding = 'utf-8-sig'
     with TemporaryDirectory() as tmpdirname:
         filePath = Path(os.path.join(tmpdirname, str(int(time.time())) + ".ps1"))
         filePath.write_text(cell, encoding=encoding)

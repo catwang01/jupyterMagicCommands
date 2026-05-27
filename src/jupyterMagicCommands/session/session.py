@@ -36,6 +36,9 @@ class Session:
         self.process.sendline('Function prompt{{"{0}"}}'.format(self.unique_prompt))
         self.process.expect(self.unique_prompt)
         self.process.expect(self.unique_prompt)
+        if sys.platform == "win32":
+            self.process.sendline("[Console]::InputEncoding=[Console]::OutputEncoding=[System.Text.Encoding]::UTF8")
+            self.process.expect(self.unique_prompt)
 
     def invoke_command(self, command: str):
         self.process.sendline(command)
