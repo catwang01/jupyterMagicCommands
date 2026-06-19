@@ -208,13 +208,17 @@ rm -rf '{path}'
             if results.exit_code and results.exit_code != 0:
                 raise Exception(results.output.decode())
         else:
-            results = self._execute_cmd(cmd, stdin=True, tty=True, socket=True)
+            # Allocate a PTY only when the user asked for interactive mode (`-i`).
+            # In batch mode, stdin-aware tools (psql, less, vim, shells) would
+            # otherwise see a TTY, enter their interactive REPL, and never exit —
+            # the socket loop in _handle_socket relies on EOF, which never arrives.
+            results = self._execute_cmd(cmd, stdin=True, tty=interactive, socket=True)
             if results.exit_code is not None and results.exit_code != 0:
                 raise Exception(results)
             outputter = self.outputterFactory.create_outputter(interactive, outFile, outVar)
-            self._handle_socket(results, outputter)
+            self._handle_socket(results, outputter, tty=interactive)
 
-    def _handle_socket(self, results: ExecResult, outputter: AbstractOutputter) -> None:
+    def _handle_socket(self, results: ExecResult, outputter: AbstractOutputter, tty: bool = True) -> None:
         sock = results.output._sock  # pylint: disable=protected-access
 
         sock.setblocking(False)
@@ -230,12 +234,34 @@ rm -rf '{path}'
                 conn.close()
 
             if mask & selectors.EVENT_READ:
-                length = 1024
-                data = conn.recv(length)
-                if not data:
-                    close_sock()
-                    return
-                outputter.write(data.decode("utf8"))
+                if tty:
+                    data = conn.recv(1024)
+                    if not data:
+                        close_sock()
+                        return
+                    outputter.write(data.decode("utf8", errors="replace"))
+                else:
+                    # tty=False -> docker daemon multiplexes stdout/stderr. Each
+                    # frame is 8-byte header (stream:1, reserved:3, len:4 BE) +
+                    # payload. We drain one frame per EVENT_READ wake-up. See
+                    # https://docs.docker.com/engine/api/v1.24/#attach-to-a-container
+                    import struct as _struct
+                    header = b""
+                    while len(header) < 8:
+                        chunk = conn.recv(8 - len(header))
+                        if not chunk:
+                            close_sock()
+                            return
+                        header += chunk
+                    _stream, payload_len = _struct.unpack(">BxxxL", header)
+                    payload = b""
+                    while len(payload) < payload_len:
+                        chunk = conn.recv(payload_len - len(payload))
+                        if not chunk:
+                            close_sock()
+                            return
+                        payload += chunk
+                    outputter.write(payload.decode("utf8", errors="replace"))
             if mask & selectors.EVENT_WRITE and dataToSend:
                 data = dataToSend.pop(0)
                 conn.send(data)  # Should be ready
